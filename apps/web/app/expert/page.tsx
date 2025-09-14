@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { LiveKitManager } from '../../lib/livekit';
-import { Phone, Mic, MicOff, Video, VideoOff, PhoneOff, User, Users, Shield, Building2 } from 'lucide-react';
+import { Phone, Mic, MicOff, Video, VideoOff, PhoneOff, User, Users, Shield, Building2, MessageSquare } from 'lucide-react';
+import ChatInterface from '../../components/ChatInterface';
 
 export default function ExpertPage() {
   const [liveKitManager, setLiveKitManager] = useState<LiveKitManager | null>(null);
@@ -13,6 +14,7 @@ export default function ExpertPage() {
   const [transferSummary, setTransferSummary] = useState<string | null>(null);
   const [isWaitingForTransfer, setIsWaitingForTransfer] = useState(true);
   const [callerContext, setCallerContext] = useState<any>(null);
+  const [showChat, setShowChat] = useState(false);
 
   const connectToTransferRoom = async () => {
     setIsConnecting(true);
@@ -140,12 +142,21 @@ export default function ExpertPage() {
               <p className="text-gray-300 mb-6">
                 Click the button below to connect and wait for warm transfers from Support Specialists.
               </p>
-              <button
-                onClick={connectToTransferRoom}
-                className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-              >
-                Connect to Transfer System
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={connectToTransferRoom}
+                  className="w-full bg-orange-600 hover:bg-orange-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                >
+                  Connect to Transfer System
+                </button>
+                <button
+                  onClick={() => setShowChat(true)}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-2"
+                >
+                  <MessageSquare className="w-5 h-5" />
+                  <span>Start AI Chat Demo</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -156,6 +167,55 @@ export default function ExpertPage() {
               <div className="animate-spin w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full mx-auto mb-4"></div>
               <h2 className="text-xl font-semibold mb-2">Connecting...</h2>
               <p className="text-gray-300">Please wait while we connect you to the transfer system</p>
+            </div>
+          </div>
+        )}
+
+        {showChat && (
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Chat Interface */}
+              <div className="h-[600px]">
+                <ChatInterface 
+                  callerType="investor"
+                  email="demo@example.com"
+                />
+              </div>
+
+              {/* Demo Info Panel */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-orange-500/20">
+                <h2 className="text-xl font-semibold mb-4">AI Chat Demo</h2>
+                
+                <div className="space-y-4">
+                  <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4">
+                    <h3 className="font-semibold text-blue-400 mb-2">Features Available</h3>
+                    <ul className="text-gray-300 text-sm space-y-1">
+                      <li>• Voice-to-text transcription</li>
+                      <li>• Context-aware AI responses</li>
+                      <li>• Text-to-speech playback</li>
+                      <li>• Conversation history</li>
+                      <li>• Investor context integration</li>
+                    </ul>
+                  </div>
+                  
+                  <div className="bg-green-900/20 border border-green-500 rounded-lg p-4">
+                    <h3 className="font-semibold text-green-400 mb-2">Try These Commands</h3>
+                    <ul className="text-gray-300 text-sm space-y-1">
+                      <li>• "I need help with my portfolio"</li>
+                      <li>• "Can you explain my investment performance?"</li>
+                      <li>• "I have questions about compliance"</li>
+                      <li>• Use the microphone for voice input</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setShowChat(false)}
+                  className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                >
+                  Close Chat Demo
+                </button>
+              </div>
             </div>
           </div>
         )}

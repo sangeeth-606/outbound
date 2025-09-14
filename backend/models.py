@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 class CreateRoomRequest(BaseModel):
     room_name: str
@@ -41,3 +41,32 @@ class CallerContextRequest(BaseModel):
 class CallerContextResponse(BaseModel):
     context: Optional[Dict[str, Any]] = None
     found: bool
+
+class ChatMessage(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+    timestamp: Optional[str] = None
+
+class ChatRequest(BaseModel):
+    message: str
+    caller_type: str
+    email: str
+    conversation_history: Optional[List[ChatMessage]] = None
+
+class ChatResponse(BaseModel):
+    success: bool
+    response: str
+    conversation_history: Optional[List[ChatMessage]] = None
+    error: Optional[str] = None
+
+class TranscribeRequest(BaseModel):
+    audio_data: str  # Base64 encoded audio
+    caller_type: str
+    email: str
+
+class TranscribeResponse(BaseModel):
+    success: bool
+    transcript: str
+    ai_response: Optional[str] = None
+    conversation_history: Optional[List[ChatMessage]] = None
+    error: Optional[str] = None

@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { LiveKitManager } from '../../lib/livekit';
-import { Phone, Mic, MicOff, Video, VideoOff, PhoneOff, User, TrendingUp, Building2 } from 'lucide-react';
+import { Phone, Mic, MicOff, Video, VideoOff, PhoneOff, User, TrendingUp, Building2, MessageSquare } from 'lucide-react';
+import ChatInterface from '../../components/ChatInterface';
 
 export default function InvestorPage() {
   const [liveKitManager, setLiveKitManager] = useState<LiveKitManager | null>(null);
@@ -13,6 +14,7 @@ export default function InvestorPage() {
   const [email, setEmail] = useState('');
   const [callerContext, setCallerContext] = useState<any>(null);
   const [contextLoaded, setContextLoaded] = useState(false);
+  const [showChat, setShowChat] = useState(false);
 
   const loadCallerContext = async () => {
     if (!email) return;
@@ -223,12 +225,21 @@ export default function InvestorPage() {
               <p className="text-gray-300 mb-6">
                 Click the button below to connect with our support specialist.
               </p>
-              <button
-                onClick={connectToCall}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-              >
-                Start Support Call
-              </button>
+              <div className="space-y-3">
+                <button
+                  onClick={connectToCall}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                >
+                  Start Support Call
+                </button>
+                <button
+                  onClick={() => setShowChat(true)}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-2"
+                >
+                  <MessageSquare className="w-5 h-5" />
+                  <span>Start AI Chat</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -325,6 +336,64 @@ export default function InvestorPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {showChat && (
+          <div className="max-w-6xl mx-auto mt-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Chat Interface */}
+              <div className="h-[600px]">
+                <ChatInterface 
+                  callerType="investor"
+                  email={email || "demo@example.com"}
+                />
+              </div>
+
+              {/* Investor Context Panel */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-blue-500/20">
+                <h2 className="text-xl font-semibold mb-4">Your Investment Profile</h2>
+                
+                {callerContext ? (
+                  <div className="space-y-4">
+                    <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4">
+                      <h3 className="font-semibold text-blue-400 mb-2">Portfolio Overview</h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-300">Total Invested:</span>
+                          <span className="text-white font-medium">{callerContext.invested_amount}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-300">Portfolio Companies:</span>
+                          <span className="text-white font-medium">{callerContext.portfolio?.length || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-green-900/20 border border-green-500 rounded-lg p-4">
+                      <h3 className="font-semibold text-green-400 mb-2">AI Assistant Features</h3>
+                      <ul className="text-gray-300 text-sm space-y-1">
+                        <li>• Portfolio performance insights</li>
+                        <li>• Compliance question handling</li>
+                        <li>• K1 form assistance</li>
+                        <li>• Portal access support</li>
+                      </ul>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-gray-400">Enter your email above to load your investment context</p>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setShowChat(false)}
+                  className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                >
+                  Close Chat
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

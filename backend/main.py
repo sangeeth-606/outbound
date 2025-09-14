@@ -10,11 +10,15 @@ from livekit_utils import create_room_token, create_room
 from twilio_utils import initiate_twilio_call
 from llm_utils import generate_call_summary
 from db_utils import get_caller_context, get_agent_by_role
+from deepgram_utils import transcribe_base64_audio
+from ai_chat_utils import generate_ai_response, create_conversation_entry
 from models import (
     CreateRoomRequest, CreateRoomResponse,
     TransferInitiateRequest, TransferInitiateResponse,
     TransferCompleteRequest, TransferCompleteResponse,
-    CallerContextRequest, CallerContextResponse
+    CallerContextRequest, CallerContextResponse,
+    ChatRequest, ChatResponse, TranscribeRequest, TranscribeResponse,
+    ChatMessage
 )
 
 # Load environment variables
@@ -162,6 +166,92 @@ async def get_caller_context_endpoint(request: CallerContextRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get caller context: {str(e)}")
+
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat_endpoint(request: ChatRequest):
+    """Handle chat messages and generate AI responses"""
+    try:
+        # Get caller context
+        caller_context = get_caller_context(request.email, request.caller_type)
+        
+        # Convert conversation history to the format expected by AI
+        conversation_history = []
+        if request.conversation_history:
+            for msg in request.conversation_history:
+                conversation_history.append({
+                    "role": msg.role,
+                    "content": msg.content
+                })
+        
+        # Generate AI response
+        ai_response = generate_ai_response(
+            user_message=request.message,
+            caller_type=request.caller_type,
+            caller_context=caller_context,
+            conversation_history=conversation_history
+        )
+        
+        # Update conversation history
+        updated_history = request.conversation_history or []
+        updated_history.append(ChatMessage(role="user", content=request.message))
+        updated_history.append(ChatMessage(role="assistant", content=ai_response))
+        
+        return ChatResponse(
+            success=True,
+            response=ai_response,
+            conversation_history=updated_history
+        )
+        
+    except Exception as e:
+        return ChatResponse(
+            success=False,
+            response="I apologize, but I'm having trouble processing your request right now.",
+            error=str(e)
+        )
+
+@app.post("/api/transcribe", response_model=TranscribeResponse)
+async def transcribe_endpoint(request: TranscribeRequest):
+    """Transcribe audio and generate AI response"""
+    try:
+        # Transcribe audio
+        transcript = await transcribe_base64_audio(request.audio_data)
+        
+        if not transcript:
+            return TranscribeResponse(
+                success=False,
+                transcript="",
+                error="Could not transcribe audio"
+            )
+        
+        # Get caller context
+        caller_context = get_caller_context(request.email, request.caller_type)
+        
+        # Generate AI response
+        ai_response = generate_ai_response(
+            user_message=transcript,
+            caller_type=request.caller_type,
+            caller_context=caller_context
+        )
+        
+        # Create conversation history
+        conversation_history = [
+            ChatMessage(role="user", content=transcript),
+            ChatMessage(role="assistant", content=ai_response)
+        ]
+        
+        return TranscribeResponse(
+            success=True,
+            transcript=transcript,
+            ai_response=ai_response,
+            conversation_history=conversation_history
+        )
+        
+    except Exception as e:
+        return TranscribeResponse(
+            success=False,
+            transcript="",
+            error=str(e)
+        )
 
 @app.post("/api/transfer/complete", response_model=TransferCompleteResponse)
 async def complete_transfer(request: TransferCompleteRequest):
