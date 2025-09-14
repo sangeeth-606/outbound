@@ -1,402 +1,318 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { LiveKitManager } from '../../lib/livekit';
-import { Phone, Mic, MicOff, Video, VideoOff, PhoneOff, User, Building2, DollarSign, MessageSquare } from 'lucide-react';
+import {
+  ControlBar,
+  GridLayout,
+  ParticipantTile,
+  RoomAudioRenderer,
+  useTracks,
+  RoomContext,
+} from '@livekit/components-react';
+import { Room, Track } from 'livekit-client';
+import '@livekit/components-styles';
+import { useEffect, useState } from 'react';
+import { Phone, MessageSquare, Users, PhoneOff, Building2, TrendingUp } from 'lucide-react';
 import ChatInterface from '../../components/ChatInterface';
 
 export default function ProspectPage() {
-  const [liveKitManager, setLiveKitManager] = useState<LiveKitManager | null>(null);
+  const room = 'prospect_support_room';
+  const name = 'prospect';
+  const [roomInstance] = useState(() => new Room({
+    adaptiveStream: true,
+    dynacast: true,
+  }));
+  const [token, setToken] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [participants, setParticipants] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [email, setEmail] = useState('');
-  const [callerContext, setCallerContext] = useState<any>(null);
-  const [contextLoaded, setContextLoaded] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [email, setEmail] = useState('');
+  const [prospectContext, setProspectContext] = useState<any>(null);
 
-  const loadCallerContext = async () => {
-    if (!email) return;
-    
-    try {
-      const response = await fetch('/api/caller/context', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email,
-          caller_type: 'prospect'
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.found) {
-          setCallerContext(data.context);
-          setContextLoaded(true);
-        } else {
-          setError('Prospect not found. Please check your email address.');
-        }
-      }
-    } catch (err) {
-      setError('Failed to load prospect information.');
-    }
-  };
+  useEffect(() => {
+    return () => {
+      roomInstance.disconnect();
+    };
+  }, [roomInstance]);
 
   const connectToCall = async () => {
-    if (!email || !contextLoaded) {
-      setError('Please enter your email and load your information first.');
+    if (!email.trim()) {
+      setError('Please enter your email address');
       return;
     }
 
-    setIsConnecting(true);
-    setError(null);
-
     try {
-      // Create room and get token
-      const response = await fetch('/api/room', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          room_name: 'prospect_inquiry_room',
-          participant_identity: 'prospect',
-          caller_type: 'prospect',
-          email: email
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create room');
+      setIsConnecting(true);
+      setError(null);
+      
+      const resp = await fetch(`/api/token?room=${room}&username=${name}`);
+      const data = await resp.json();
+      
+      if (data.token) {
+        setToken(data.token);
+        await roomInstance.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, data.token);
+        setIsConnected(true);
+        setIsConnecting(false);
+        
+        // Mock prospect context for demo
+        setProspectContext({
+          name: "Jane Smith",
+          email: email,
+          interest: "Early-stage AI investments",
+          budget: "$25,000 - $100,000",
+          experience: "First-time investor",
+          status: "Qualified Prospect",
+          lastContact: "1 week ago"
+        });
       }
-
-      const { room_name, access_token } = await response.json();
-
-      // Create LiveKit manager
-      const manager = new LiveKitManager(
-        (participant) => {
-          console.log('Participant connected:', participant.identity);
-          setParticipants(prev => [...prev, participant]);
-        },
-        (participant) => {
-          console.log('Participant disconnected:', participant.identity);
-          setParticipants(prev => prev.filter(p => p.identity !== participant.identity));
-        },
-        () => {
-          console.log('Connected to room');
-          setIsConnected(true);
-          setIsConnecting(false);
-        },
-        () => {
-          console.log('Disconnected from room');
-          setIsConnected(false);
-          setParticipants([]);
-        }
-      );
-
-      // Connect to room
-      await manager.connect({
-        url: process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://outbound-gkkdznzy.livekit.cloud',
-        token: access_token,
-        roomName: room_name,
-      });
-
-      setLiveKitManager(manager);
-    } catch (err) {
-      console.error('Failed to connect:', err);
-      setError(err instanceof Error ? err.message : 'Failed to connect');
+    } catch (e) {
+      console.error('Connection error:', e);
+      setError(e instanceof Error ? e.message : 'Failed to connect');
       setIsConnecting(false);
     }
   };
 
   const disconnect = async () => {
-    if (liveKitManager) {
-      await liveKitManager.disconnect();
-      setLiveKitManager(null);
-      setIsConnected(false);
-      setParticipants([]);
-    }
+    await roomInstance.disconnect();
+    setIsConnected(false);
+    setProspectContext(null);
   };
 
-  const toggleMicrophone = async () => {
-    if (liveKitManager) {
-      await liveKitManager.toggleMicrophone();
-    }
-  };
-
-  const toggleCamera = async () => {
-    if (liveKitManager) {
-      await liveKitManager.toggleCamera();
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (liveKitManager) {
-        liveKitManager.disconnect();
-      }
-    };
-  }, [liveKitManager]);
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900 text-white">
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <Building2 className="w-8 h-8 text-green-400 mr-3" />
-            <h1 className="text-3xl font-bold">Prospective Investor</h1>
-          </div>
-          <p className="text-gray-300">Connect with our General Partners for investment opportunities</p>
+  if (isConnecting) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900 text-white flex items-center justify-center">
+        <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-8 max-w-md mx-auto border border-green-500/20">
+          <div className="animate-spin w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold mb-2">Connecting...</h2>
+          <p className="text-gray-300">Please wait while we connect you to our investment team</p>
         </div>
+      </div>
+    );
+  }
 
-        {error && (
-          <div className="bg-red-600/20 border border-red-500 text-red-200 p-4 rounded-lg mb-6 text-center">
-            Error: {error}
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900 text-white flex items-center justify-center">
+        <div className="bg-red-600/20 border border-red-500 text-red-200 p-4 rounded-lg max-w-md mx-auto">
+          Error: {error}
+        </div>
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900 text-white">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center mb-4">
+              <Building2 className="w-8 h-8 text-green-400 mr-3" />
+              <h1 className="text-3xl font-bold">Investment Opportunities</h1>
+            </div>
+            <p className="text-gray-300">Connect with our investment team to learn about opportunities</p>
           </div>
-        )}
 
-        {!contextLoaded && (
-          <div className="max-w-md mx-auto mb-8">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-8 border border-green-500/20">
-              <h2 className="text-xl font-semibold mb-4 text-center">Prospect Verification</h2>
-              <div className="space-y-4">
+          <div className="text-center">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-8 max-w-md mx-auto border border-green-500/20">
+              <TrendingUp className="w-16 h-16 text-green-400 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-4">Start Your Investment Journey</h2>
+              
+              <div className="space-y-4 mb-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Email Address
+                    Your Email Address
                   </label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email address"
-                    className="w-full px-4 py-2 bg-white/10 border border-green-500/30 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-400"
+                    placeholder="prospect@example.com"
+                    className="w-full px-4 py-2 bg-white/10 border border-green-500/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500"
                   />
                 </div>
-                <button
-                  onClick={loadCallerContext}
-                  disabled={!email}
-                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                >
-                  Load My Information
-                </button>
               </div>
-            </div>
-          </div>
-        )}
 
-        {contextLoaded && callerContext && (
-          <div className="max-w-4xl mx-auto mb-8">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-green-500/20">
-              <h2 className="text-xl font-semibold mb-4">Your Investment Profile</h2>
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="font-semibold text-green-300 mb-2">Prospect Details</h3>
-                  <div className="space-y-2 text-sm">
-                    <p><span className="text-gray-400">Name:</span> {callerContext.data.name}</p>
-                    <p><span className="text-gray-400">Email:</span> {callerContext.data.email}</p>
-                    <p><span className="text-gray-400">Accreditation:</span> {callerContext.data.accredited_status}</p>
-                    <p><span className="text-gray-400">Interest Level:</span> ${callerContext.data.interested_amount.toLocaleString()}</p>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-green-300 mb-2">Investment Focus</h3>
-                  <div className="space-y-2 text-sm">
-                    <p><span className="text-gray-400">Source:</span> {callerContext.data.source}</p>
-                    <p><span className="text-gray-400">Notes:</span> {callerContext.data.notes}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {!isConnected && !isConnecting && contextLoaded && (
-          <div className="text-center">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-8 max-w-md mx-auto border border-green-500/20">
-              <Phone className="w-16 h-16 text-green-400 mx-auto mb-4" />
-              <h2 className="text-xl font-semibold mb-4">Ready to Connect</h2>
-              <p className="text-gray-300 mb-6">
-                Click the button below to connect with our General Partners.
-              </p>
               <div className="space-y-3">
                 <button
                   onClick={connectToCall}
                   className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
                 >
-                  Start Investment Discussion
+                  Connect to Investment Team
                 </button>
                 <button
                   onClick={() => setShowChat(true)}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-2"
                 >
                   <MessageSquare className="w-5 h-5" />
-                  <span>Start AI Chat</span>
+                  <span>Start AI Chat Demo</span>
                 </button>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      </div>
+    );
+  }
 
-        {isConnecting && (
-          <div className="text-center">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-8 max-w-md mx-auto border border-green-500/20">
-              <div className="animate-spin w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-              <h2 className="text-xl font-semibold mb-2">Connecting...</h2>
-              <p className="text-gray-300">Please wait while we connect you to our General Partners</p>
-            </div>
-          </div>
-        )}
-
-        {isConnected && (
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-6 mb-6 border border-green-500/20">
-              <h2 className="text-xl font-semibold mb-4">Investment Discussion in Progress</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div className="bg-white/5 rounded-lg p-4">
-                  <h3 className="font-semibold mb-2">Your Video</h3>
-                  <div className="aspect-video bg-white/10 rounded-lg flex items-center justify-center">
-                    <Video className="w-12 h-12 text-gray-400" />
-                  </div>
-                </div>
-                <div className="bg-white/5 rounded-lg p-4">
-                  <h3 className="font-semibold mb-2">General Partner Video</h3>
-                  <div className="aspect-video bg-white/10 rounded-lg flex items-center justify-center">
-                    {participants.length > 0 ? (
-                      <div className="text-center">
-                        <User className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-400">General Partner Connected</p>
-                      </div>
-                    ) : (
-                      <div className="text-center">
-                        <div className="animate-pulse w-12 h-12 bg-gray-500 rounded-full mx-auto mb-2"></div>
-                        <p className="text-sm text-gray-400">Waiting for General Partner...</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-center space-x-4 mb-6">
-                <button
-                  onClick={toggleMicrophone}
-                  className={`p-3 rounded-full transition-colors ${
-                    liveKitManager?.isMicrophoneEnabled() 
-                      ? 'bg-green-600 hover:bg-green-700' 
-                      : 'bg-red-600 hover:bg-red-700'
-                  }`}
-                >
-                  {liveKitManager?.isMicrophoneEnabled() ? (
-                    <Mic className="w-6 h-6" />
-                  ) : (
-                    <MicOff className="w-6 h-6" />
-                  )}
-                </button>
-                
-                <button
-                  onClick={toggleCamera}
-                  className={`p-3 rounded-full transition-colors ${
-                    liveKitManager?.isCameraEnabled() 
-                      ? 'bg-green-600 hover:bg-green-700' 
-                      : 'bg-red-600 hover:bg-red-700'
-                  }`}
-                >
-                  {liveKitManager?.isCameraEnabled() ? (
-                    <Video className="w-6 h-6" />
-                  ) : (
-                    <VideoOff className="w-6 h-6" />
-                  )}
-                </button>
-                
-                <button
-                  onClick={disconnect}
-                  className="p-3 rounded-full bg-red-600 hover:bg-red-700 transition-colors"
-                >
-                  <PhoneOff className="w-6 h-6" />
-                </button>
-              </div>
-            </div>
-
-            {participants.length > 0 && (
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-green-500/20">
-                <h3 className="text-lg font-semibold mb-4">Connected Participants</h3>
-                <div className="space-y-2">
-                  {participants.map((participant, index) => (
-                    <div key={index} className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <span className="text-gray-300">{participant.identity}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {showChat && (
-          <div className="max-w-6xl mx-auto mt-8">
+  if (showChat) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900 text-white">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-6xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Chat Interface */}
               <div className="h-[600px]">
                 <ChatInterface 
                   callerType="prospect"
-                  email={email || "demo@example.com"}
+                  email={email}
                 />
               </div>
-
-              {/* Prospect Context Panel */}
               <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-green-500/20">
-                <h2 className="text-xl font-semibold mb-4">Investment Opportunity</h2>
-                
-                {callerContext ? (
-                  <div className="space-y-4">
+                <h2 className="text-xl font-semibold mb-4">AI Investment Assistant</h2>
+                <div className="space-y-4">
+                  <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4">
+                    <h3 className="font-semibold text-blue-400 mb-2">Prospect Features</h3>
+                    <ul className="text-gray-300 text-sm space-y-1">
+                      <li>• Investment opportunity exploration</li>
+                      <li>• Portfolio strategy guidance</li>
+                      <li>• Risk assessment information</li>
+                      <li>• Due diligence support</li>
+                      <li>• Investment process guidance</li>
+                    </ul>
+                  </div>
+                  
+                  {prospectContext && (
                     <div className="bg-green-900/20 border border-green-500 rounded-lg p-4">
                       <h3 className="font-semibold text-green-400 mb-2">Your Profile</h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-300">Company:</span>
-                          <span className="text-white font-medium">{callerContext.company}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-300">Interest:</span>
-                          <span className="text-white font-medium">{callerContext.interest}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-300">Investment Size:</span>
-                          <span className="text-white font-medium">{callerContext.investment_size}</span>
-                        </div>
+                      <div className="text-gray-300 text-sm space-y-1">
+                        <p><strong>Status:</strong> {prospectContext.status}</p>
+                        <p><strong>Interest:</strong> {prospectContext.interest}</p>
+                        <p><strong>Budget:</strong> {prospectContext.budget}</p>
+                        <p><strong>Experience:</strong> {prospectContext.experience}</p>
+                        <p><strong>Last Contact:</strong> {prospectContext.lastContact}</p>
                       </div>
                     </div>
-                    
-                    <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4">
-                      <h3 className="font-semibold text-blue-400 mb-2">AI Assistant Features</h3>
-                      <ul className="text-gray-300 text-sm space-y-1">
-                        <li>• Investment thesis explanation</li>
-                        <li>• Portfolio company insights</li>
-                        <li>• Track record information</li>
-                        <li>• Due diligence guidance</li>
-                      </ul>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-gray-400">Enter your email above to load your prospect context</p>
-                  </div>
-                )}
-
+                  )}
+                </div>
                 <button
                   onClick={() => setShowChat(false)}
                   className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
                 >
-                  Close Chat
+                  Close Chat Demo
                 </button>
               </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
-    </div>
+    );
+  }
+
+  return (
+    <RoomContext.Provider value={roomInstance}>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900 text-white">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center mb-4">
+              <Building2 className="w-8 h-8 text-green-400 mr-3" />
+              <h1 className="text-3xl font-bold">Investment Consultation</h1>
+            </div>
+            <p className="text-gray-300">Connected to our investment team</p>
+          </div>
+
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Video Conference */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-green-500/20">
+                <h2 className="text-xl font-semibold mb-4">Investment Consultation</h2>
+                <div data-lk-theme="default" style={{ height: '400px' }}>
+                  <MyVideoConference />
+                  <RoomAudioRenderer />
+                  <ControlBar />
+                </div>
+              </div>
+
+              {/* Prospect Context */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-green-500/20">
+                <h2 className="text-xl font-semibold mb-4">Prospect Information</h2>
+                
+                {prospectContext ? (
+                  <div className="space-y-4">
+                    <div className="bg-green-900/20 border border-green-500 rounded-lg p-4">
+                      <h3 className="font-semibold text-green-400 mb-2">Prospect Details</h3>
+                      <div className="text-gray-300 text-sm space-y-1">
+                        <p><strong>Name:</strong> {prospectContext.name}</p>
+                        <p><strong>Email:</strong> {prospectContext.email}</p>
+                        <p><strong>Status:</strong> {prospectContext.status}</p>
+                        <p><strong>Interest:</strong> {prospectContext.interest}</p>
+                        <p><strong>Budget:</strong> {prospectContext.budget}</p>
+                        <p><strong>Experience:</strong> {prospectContext.experience}</p>
+                        <p><strong>Last Contact:</strong> {prospectContext.lastContact}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4">
+                      <h3 className="font-semibold text-blue-400 mb-2">Consultation Options</h3>
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => setShowChat(true)}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                        >
+                          Use AI Assistant
+                        </button>
+                        <button
+                          className="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                        >
+                          Schedule Follow-up
+                        </button>
+                        <button
+                          className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                        >
+                          Send Investment Materials
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Users className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-400 mb-2">Loading Prospect Data</h3>
+                    <p className="text-gray-500">
+                      Your prospect information will appear here once connected.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-6 text-center">
+              <button
+                onClick={disconnect}
+                className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2 mx-auto"
+              >
+                <PhoneOff className="w-5 h-5" />
+                <span>End Call</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </RoomContext.Provider>
+  );
+}
+
+function MyVideoConference() {
+  const tracks = useTracks(
+    [
+      { source: Track.Source.Camera, withPlaceholder: true },
+      { source: Track.Source.ScreenShare, withPlaceholder: false },
+    ],
+    { onlySubscribed: false },
+  );
+  return (
+    <GridLayout tracks={tracks} style={{ height: 'calc(100% - 60px)' }}>
+      <ParticipantTile />
+    </GridLayout>
   );
 }
