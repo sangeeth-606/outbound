@@ -1,7 +1,7 @@
 import os
 import asyncio
 from twilio.rest import Client
-from twilio.twiml import VoiceResponse
+from twilio.twiml.voice_response import VoiceResponse
 import logging
 
 # Configure logging
