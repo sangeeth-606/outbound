@@ -1,11 +1,11 @@
 # Warm Transfer Demo Application
 
-A comprehensive demonstration of warm call transfer functionality built with LiveKit, OpenAI, and Twilio. This application showcases seamless call transfers between agents with AI-powered context sharing.
+i A comprehensive demonstration of warm call transfer functionality built with LiveKit, Groq LLM, and Twilio. This application showcases seamless call transfers between agents with AI-powered context sharing.
 
 ## 🎯 Features
 
 - **Real-time Communication**: LiveKit-powered video/audio calls
-- **AI-Powered Summaries**: OpenAI GPT generates call context for transfers
+- **AI-Powered Summaries**: Groq LLM generates call context for transfers
 - **Phone Integration**: Twilio enables transfers to real phone numbers
 - **Interactive UI**: Next.js frontend with role-based interfaces
 - **Warm Transfer Flow**: Complete agent handoff with context preservation
@@ -16,7 +16,7 @@ The application consists of:
 - **Backend**: Python FastAPI server handling room management, transfers, and API integrations
 - **Frontend**: Next.js application with role-based UI for Caller, Agent A, and Agent B
 - **LiveKit**: Real-time communication platform for audio/video calls
-- **OpenAI**: AI service for generating call summaries
+- **Groq**: Free AI service for generating call summaries
 - **Twilio**: Telephony service for phone number integration
 
 ## 🚀 Quick Start
@@ -26,7 +26,7 @@ The application consists of:
 - Python 3.8+
 - Node.js 18+
 - LiveKit account and server
-- OpenAI API key
+- Groq API key (free)
 - Twilio account (for phone integration)
 
 ### 1. Backend Setup
@@ -50,8 +50,8 @@ LIVEKIT_URL=wss://your-livekit-server.com
 LIVEKIT_API_KEY=your_livekit_api_key_here
 LIVEKIT_API_SECRET=your_livekit_api_secret_here
 
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key_here
+# Groq Configuration (Free LLM API)
+groq_key=your_groq_api_key_here
 
 # Twilio Configuration
 TWILIO_ACCOUNT_SID=your_twilio_account_sid_here
@@ -153,7 +153,7 @@ The application will be available at:
 - WebRTC for low-latency streaming
 
 ### AI-Powered Summaries
-- OpenAI GPT-3.5-turbo for call summarization
+- Groq Llama-3.1-70b-versatile for call summarization
 - Context-aware prompts for warm transfer scenarios
 - Fallback summaries if AI service is unavailable
 
@@ -179,10 +179,10 @@ The application will be available at:
 - Check API key and secret
 - Ensure LiveKit server is running
 
-**OpenAI API Errors**
+**Groq API Errors**
 - Verify API key is valid
-- Check API quota and billing
-- Review rate limiting
+- Check API quota and rate limits
+- Review Groq service status
 
 **Twilio Integration Issues**
 - Verify account credentials
@@ -197,7 +197,7 @@ The application will be available at:
 ## 📚 Additional Resources
 
 - [LiveKit Documentation](https://docs.livekit.io/)
-- [OpenAI API Reference](https://platform.openai.com/docs)
+- [Groq API Reference](https://console.groq.com/docs)
 - [Twilio Voice API](https://www.twilio.com/docs/voice)
 - [Next.js Documentation](https://nextjs.org/docs)
 

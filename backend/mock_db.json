@@ -1,0 +1,62 @@
+{
+  "investors": [
+    {
+      "id": "inv_001",
+      "name": "Cory Hill",
+      "email": "cory@example.com",
+      "accredited_status": "Verified",
+      "invested_amount": 50000,
+      "portfolio_companies": ["Neuralix AI", "GreenSynth Labs", "Quantum Compute Inc."],
+      "recent_tickets": ["Portal access issue (Resolved)", "K1 form request"]
+    },
+    {
+      "id": "inv_002", 
+      "name": "Maria Rodriguez",
+      "email": "maria.rodriguez@example.com",
+      "accredited_status": "Verified",
+      "invested_amount": 125000,
+      "portfolio_companies": ["Neuralix AI", "GreenSynth Labs", "Quantum Compute Inc.", "DataFlow Systems"],
+      "recent_tickets": ["Quarterly report access", "Portfolio performance query"]
+    }
+  ],
+  "prospects": [
+    {
+      "id": "pro_001",
+      "name": "Alex Johnson",
+      "email": "alex.johnson@example.com",
+      "accredited_status": "In Verification",
+      "interested_amount": 25000,
+      "notes": "Very interested in AI startups. Asked about the due diligence process.",
+      "source": "Website Form"
+    },
+    {
+      "id": "pro_002",
+      "name": "Jennifer Chen",
+      "email": "j.chen@example.com", 
+      "accredited_status": "Verified",
+      "interested_amount": 75000,
+      "notes": "Family office representative. Interested in clean tech and biotech investments.",
+      "source": "Referral from existing investor"
+    }
+  ],
+  "agents": [
+    { 
+      "id": "agent_alpha", 
+      "name": "Kaushik M.", 
+      "role": "General Partner", 
+      "twilio_phone": "+19295551234" 
+    },
+    { 
+      "id": "agent_bravo", 
+      "name": "Portfolio Support", 
+      "role": "Support Specialist", 
+      "twilio_phone": null 
+    },
+    { 
+      "id": "agent_charlie", 
+      "name": "Sarah L.", 
+      "role": "Compliance Officer", 
+      "twilio_phone": "+19295555678" 
+    }
+  ]
+}

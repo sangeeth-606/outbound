@@ -9,29 +9,25 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# LiveKit configuration
-LIVEKIT_URL = os.getenv("LIVEKIT_URL", "wss://your-livekit-server.com")
-LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
-LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
-
 def create_room_token(room_name: str, participant_identity: str) -> str:
     """Create a LiveKit access token for a participant to join a room"""
-    if not LIVEKIT_API_KEY or not LIVEKIT_API_SECRET:
+    # Load environment variables at function level
+    livekit_api_key = os.getenv("LIVEKIT_API_KEY")
+    livekit_api_secret = os.getenv("LIVEKIT_API_SECRET")
+    
+    if not livekit_api_key or not livekit_api_secret:
         raise ValueError("LiveKit API key and secret must be set in environment variables")
     
-    # Create access token
-    token = AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
-    token.identity = participant_identity
-    
-    # Grant permissions
-    grants = VideoGrants()
-    grants.room_join = True
-    grants.room = room_name
-    grants.can_publish = True
-    grants.can_subscribe = True
-    grants.can_publish_data = True
-    
-    token.add_grant(grants)
+    # Create access token with identity and grants
+    token = AccessToken(livekit_api_key, livekit_api_secret) \
+        .with_identity(participant_identity) \
+        .with_grants(VideoGrants(
+            room_join=True,
+            room=room_name,
+            can_publish=True,
+            can_subscribe=True,
+            can_publish_data=True
+        ))
     
     # Generate JWT token
     jwt_token = token.to_jwt()
@@ -54,4 +50,4 @@ async def create_room(room_name: str) -> bool:
 
 def get_livekit_url() -> str:
     """Get the LiveKit server URL"""
-    return LIVEKIT_URL
+    return os.getenv("LIVEKIT_URL", "wss://your-livekit-server.com")

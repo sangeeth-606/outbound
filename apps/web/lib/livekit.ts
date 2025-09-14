@@ -30,13 +30,6 @@ export class LiveKitManager {
       this.room = new Room({
         adaptiveStream: true,
         dynacast: true,
-        publishDefaults: {
-          videoSimulcastLayers: [
-            { resolution: { width: 320, height: 180 }, encoding: { maxBitrate: 200_000 } },
-            { resolution: { width: 640, height: 360 }, encoding: { maxBitrate: 500_000 } },
-            { resolution: { width: 1280, height: 720 }, encoding: { maxBitrate: 1_000_000 } },
-          ],
-        },
       });
 
       // Set up event listeners

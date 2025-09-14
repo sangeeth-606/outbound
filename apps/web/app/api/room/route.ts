@@ -15,6 +15,8 @@ export async function POST(request: NextRequest) {
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Backend error:', errorText);
       throw new Error(`Backend responded with status: ${response.status}`);
     }
 
