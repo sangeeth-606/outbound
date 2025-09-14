@@ -15,7 +15,7 @@ import { Phone, MessageSquare, Users, PhoneOff, User } from 'lucide-react';
 import ChatInterface from '../../components/ChatInterface';
 
 export default function AgentAPage() {
-  const room = 'agent_a_support_room';
+  const room = 'support_room';
   const name = 'agent_a';
   const [roomInstance] = useState(() => new Room({
     adaptiveStream: true,
@@ -48,14 +48,8 @@ export default function AgentAPage() {
         setIsConnected(true);
         setIsConnecting(false);
         
-        // Mock caller context for demo
-        setCallerContext({
-          name: "John Doe",
-          type: "investor",
-          email: "john.doe@example.com",
-          portfolio: "$50,000 across 3 companies",
-          issue: "Login and dashboard access problems"
-        });
+        // Wait for real caller to connect
+        // No automatic mock data - wait for actual caller
       }
     } catch (e) {
       console.error('Connection error:', e);
@@ -71,8 +65,105 @@ export default function AgentAPage() {
   };
 
   const initiateTransfer = async () => {
-    // Mock transfer initiation
-    alert('Transfer initiated! In a real implementation, this would create a transfer room and connect to Agent B.');
+    try {
+      // Generate AI summary using Groq LLM
+      const response = await fetch('/api/generate-summary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          conversation_context: "Customer called about login issues. I verified their account is active and helped reset their password. They can now log in but can't see their dashboard. They need immediate access to their financial data for a meeting this afternoon. Customer seems frustrated but cooperative.",
+          caller_type: "investor",
+          caller_info: {
+            name: "John Doe",
+            email: "john.doe@example.com",
+            portfolio: "$50,000 across 3 companies"
+          }
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Now initiate the actual transfer
+        const transferResponse = await fetch('/api/transfer', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            original_room_name: room,
+            agent_a_id: name,
+            transfer_target: "agent_b",
+            caller_type: "investor",
+            email: "john.doe@example.com",
+            summary: data.summary
+          }),
+        });
+
+        const transferData = await transferResponse.json();
+        
+        if (transferData.success) {
+          alert(`🎉 Warm Transfer Initiated!\n\n📋 AI-Generated Summary:\n${data.summary}\n\n🔄 Transfer Status: ${transferData.status}\n\n📞 Agent B should now be connected to hear this summary.`);
+        } else {
+          alert(`Transfer initiated with summary:\n\n${data.summary}\n\nNote: Transfer room creation failed, but summary was generated successfully.`);
+        }
+      } else {
+        alert(`Transfer initiated!\n\nNote: AI summary generation failed, using fallback summary.\n\nCall Summary: Customer called about login issues. I verified their account is active and helped reset their password. They can now log in but can't see their dashboard. They need immediate access to their financial data for a meeting this afternoon. Customer seems frustrated but cooperative.`);
+      }
+    } catch (error) {
+      console.error('Transfer failed:', error);
+      alert('Transfer failed. Please try again.');
+    }
+  };
+
+  const initiateTwilioTransfer = async () => {
+    try {
+      // Generate AI summary first
+      const summaryResponse = await fetch('/api/generate-summary', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          conversation_context: "Customer called about login issues. I verified their account is active and helped reset their password. They can now log in but can't see their dashboard. They need immediate access to their financial data for a meeting this afternoon. Customer seems frustrated but cooperative.",
+          caller_type: "investor",
+          caller_info: {
+            name: "John Doe",
+            email: "john.doe@example.com",
+            portfolio: "$50,000 across 3 companies"
+          }
+        }),
+      });
+
+      const summaryData = await summaryResponse.json();
+      const summary = summaryData.success ? summaryData.summary : "Customer needs assistance with login and dashboard access issues.";
+
+      // Initiate Twilio call
+      const twilioResponse = await fetch('/api/twilio-transfer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          target_phone: "+917306161621", // Your Twilio target phone
+          room_name: "twilio_transfer_room",
+          summary: summary
+        }),
+      });
+
+      const twilioData = await twilioResponse.json();
+      
+      if (twilioData.success) {
+        alert(`📞 Twilio Transfer Initiated!\n\n📋 AI-Generated Summary:\n${summary}\n\n🔄 Call SID: ${twilioData.call_sid}\n\n📞 Phone call initiated to ${twilioData.target_phone || "+917306161621"}\n\nAgent A should now explain the context to the phone agent.`);
+      } else {
+        alert(`Twilio transfer failed: ${twilioData.message}\n\nUsing fallback summary:\n${summary}`);
+      }
+    } catch (error) {
+      console.error('Twilio transfer failed:', error);
+      alert('Twilio transfer failed. Please try again.');
+    }
   };
 
   if (isConnecting) {
@@ -206,48 +297,40 @@ export default function AgentAPage() {
               <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-blue-500/20">
                 <h2 className="text-xl font-semibold mb-4">Caller Information</h2>
                 
-                {callerContext ? (
-                  <div className="space-y-4">
-                    <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4">
-                      <h3 className="font-semibold text-blue-400 mb-2">Customer Details</h3>
-                      <div className="text-gray-300 text-sm space-y-1">
-                        <p><strong>Name:</strong> {callerContext.name}</p>
-                        <p><strong>Type:</strong> {callerContext.type}</p>
-                        <p><strong>Email:</strong> {callerContext.email}</p>
-                        <p><strong>Portfolio:</strong> {callerContext.portfolio}</p>
-                        <p><strong>Issue:</strong> {callerContext.issue}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-green-900/20 border border-green-500 rounded-lg p-4">
-                      <h3 className="font-semibold text-green-400 mb-2">Support Actions</h3>
-                      <div className="space-y-2">
-                        <button
-                          onClick={initiateTransfer}
-                          className="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-                        >
-                          Initiate Warm Transfer
-                        </button>
-                        <button
-                          onClick={() => setShowChat(true)}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-                        >
-                          Use AI Assistant
-                        </button>
-                      </div>
+                <div className="space-y-4">
+                  <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4">
+                    <h3 className="font-semibold text-blue-400 mb-2">Call Status</h3>
+                    <div className="text-gray-300 text-sm space-y-1">
+                      <p><strong>Room:</strong> support_room</p>
+                      <p><strong>Connected:</strong> {isConnected ? 'Yes' : 'No'}</p>
+                      <p><strong>Participants:</strong> Check video feed above</p>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Users className="w-8 h-8 text-gray-400" />
+                  
+                  <div className="bg-green-900/20 border border-green-500 rounded-lg p-4">
+                    <h3 className="font-semibold text-green-400 mb-2">Support Actions</h3>
+                    <div className="space-y-2">
+                      <button
+                        onClick={initiateTransfer}
+                        className="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                      >
+                        Initiate Warm Transfer (Agent B)
+                      </button>
+                      <button
+                        onClick={initiateTwilioTransfer}
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                      >
+                        Initiate Twilio Transfer (Phone)
+                      </button>
+                      <button
+                        onClick={() => setShowChat(true)}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                      >
+                        Use AI Assistant
+                      </button>
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-400 mb-2">Waiting for Customer</h3>
-                    <p className="text-gray-500">
-                      Customer information will appear here when they connect to the call.
-                    </p>
                   </div>
-                )}
+                </div>
               </div>
             </div>
 

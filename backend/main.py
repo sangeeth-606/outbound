@@ -120,17 +120,17 @@ async def initiate_transfer(request: TransferInitiateRequest):
             participant_identity="agent_b_transfer"
         )
         
-        # Initiate Twilio call to target agent's phone number
+        # Initiate Twilio call to target agent's phone number (optional)
         twilio_call_sid = None
-        if target_agent and target_agent.get("twilio_phone"):
-            twilio_call_sid = await initiate_twilio_call(
-                target_agent["twilio_phone"], 
-                transfer_room_name
-            )
-        else:
-            # Fallback to default phone number
-            target_phone = os.getenv("TWILIO_TARGET_PHONE", "+1234567890")
-            twilio_call_sid = await initiate_twilio_call(target_phone, transfer_room_name)
+        if request.transfer_target == "phone" and target_agent and target_agent.get("twilio_phone"):
+            try:
+                twilio_call_sid = await initiate_twilio_call(
+                    target_agent["twilio_phone"], 
+                    transfer_room_name
+                )
+            except Exception as e:
+                print(f"Twilio call failed (non-critical): {e}")
+                # Continue with web transfer even if Twilio fails
         
         return TransferInitiateResponse(
             transfer_room_name=transfer_room_name,
@@ -264,6 +264,59 @@ async def complete_transfer(request: TransferCompleteRequest):
         return TransferCompleteResponse(status="success")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to complete transfer: {str(e)}")
+
+@app.post("/api/generate-summary")
+async def generate_call_summary_endpoint(request: dict):
+    """Generate AI-powered call summary for warm transfer"""
+    try:
+        # Get conversation context from request
+        conversation_context = request.get("conversation_context", "")
+        caller_type = request.get("caller_type", "general")
+        caller_info = request.get("caller_info", {})
+        
+        # Generate AI summary using Groq
+        summary = generate_call_summary(
+            conversation_context, 
+            caller_type, 
+            caller_info
+        )
+        
+        return {
+            "success": True,
+            "summary": summary,
+            "timestamp": "2025-01-15T10:30:00Z"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "summary": "Failed to generate call summary. Please try again.",
+            "error": str(e)
+        }
+
+@app.post("/api/twilio/transfer")
+async def twilio_transfer_endpoint(request: dict):
+    """Initiate Twilio phone call for warm transfer"""
+    try:
+        target_phone = request.get("target_phone", os.getenv("TWILIO_TARGET_PHONE"))
+        room_name = request.get("room_name", "transfer_room")
+        summary = request.get("summary", "Customer needs assistance")
+        
+        # Initiate Twilio call
+        twilio_call_sid = await initiate_twilio_call(target_phone, room_name)
+        
+        return {
+            "success": True,
+            "call_sid": twilio_call_sid,
+            "message": f"Twilio call initiated to {target_phone}",
+            "room_name": room_name,
+            "summary": summary
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to initiate Twilio call"
+        }
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

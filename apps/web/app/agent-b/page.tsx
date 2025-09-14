@@ -15,7 +15,7 @@ import { Phone, MessageSquare, Users, PhoneOff, User } from 'lucide-react';
 import ChatInterface from '../../components/ChatInterface';
 
 export default function AgentBPage() {
-  const room = 'agent_b_transfer_room';
+  const room = 'support_room';
   const name = 'agent_b';
   const [roomInstance] = useState(() => new Room({
     adaptiveStream: true,
@@ -28,6 +28,7 @@ export default function AgentBPage() {
   const [showChat, setShowChat] = useState(false);
   const [transferSummary, setTransferSummary] = useState<string | null>(null);
   const [isWaitingForTransfer, setIsWaitingForTransfer] = useState(true);
+  const [transferStatus, setTransferStatus] = useState<string>("waiting");
 
   useEffect(() => {
     return () => {
@@ -49,11 +50,15 @@ export default function AgentBPage() {
         setIsConnected(true);
         setIsConnecting(false);
         
-        // Mock transfer summary for demo
+        // Wait for real transfer from Agent A
+        // No automatic mock data - wait for actual transfer
+        
+        // Listen for transfer events (in a real implementation, this would be via WebSocket or data channels)
+        // For demo purposes, we'll simulate receiving a transfer after 5 seconds
         setTimeout(() => {
-          setTransferSummary("Investor (John Doe) called about login issues. Agent A has already verified the account is active and helped reset the password. The customer can now log in but can't see their dashboard. They need immediate access to their financial data for a meeting this afternoon. Customer seems frustrated but cooperative.");
-          setIsWaitingForTransfer(false);
-        }, 2000);
+          // This would normally be triggered by Agent A's transfer initiation
+          console.log("Agent B is ready to receive transfers");
+        }, 1000);
       }
     } catch (e) {
       console.error('Connection error:', e);

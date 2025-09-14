@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    const response = await fetch(`${BACKEND_URL}/api/transfer/initiate`, {
+    const response = await fetch(`${BACKEND_URL}/api/twilio/transfer`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -16,14 +16,14 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Backend transfer error:', errorText);
+      console.error('Backend Twilio transfer error:', errorText);
       throw new Error(`Backend responded with status: ${response.status}`);
     }
 
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Transfer API error:', error);
+    console.error('Twilio transfer API error:', error);
     return NextResponse.json(
       { 
         success: false, 

@@ -15,7 +15,7 @@ import { Phone, MessageSquare, Users, PhoneOff, User } from 'lucide-react';
 import ChatInterface from '../../components/ChatInterface';
 
 export default function CallerPage() {
-  const room = 'customer_support_room';
+  const room = 'support_room';
   const name = 'customer';
   const [roomInstance] = useState(() => new Room({
     adaptiveStream: true,

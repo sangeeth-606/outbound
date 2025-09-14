@@ -15,7 +15,7 @@ import { Shield, MessageSquare, Users, Phone } from 'lucide-react';
 import ChatInterface from '../../components/ChatInterface';
 
 export default function ExpertPage() {
-  const room = 'expert_transfer_room';
+  const room = 'support_room';
   const name = 'expert';
   const [roomInstance] = useState(() => new Room({
     adaptiveStream: true,
@@ -52,11 +52,8 @@ export default function ExpertPage() {
         setIsConnected(true);
         setIsConnecting(false);
         
-        // Mock transfer summary for demo
-        setTimeout(() => {
-          setTransferSummary("Investor (Cory Hill) called about a portfolio access issue. They have $50,000 invested across 3 companies: Neuralix AI, GreenSynth Labs, and Quantum Compute Inc. They've had recent issues with portal access and K1 form requests. The customer needs immediate assistance with their dashboard access for a meeting this afternoon.");
-          setIsWaitingForTransfer(false);
-        }, 2000);
+        // Wait for real transfer from Agent A
+        // No automatic mock data - wait for actual transfer
       }
     } catch (e) {
       console.error('Connection error:', e);
