@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -47,4 +51,40 @@ a {
   .imgDark {
     display: unset;
   }
+}
+
+/* LiveKit specific styles */
+.lk-room-container {
+  height: 100vh;
+  width: 100vw;
+}
+
+.lk-participant-tile {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.lk-control-bar {
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.lk-button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.lk-button:hover {
+  background: #2563eb;
+}
+
+.lk-button:disabled {
+  background: #6b7280;
+  cursor: not-allowed;
 }

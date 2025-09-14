@@ -1,102 +1,116 @@
-import Image, { type ImageProps } from "next/image";
-import { Button } from "@repo/ui/button";
-import styles from "./page.module.css";
-
-type Props = Omit<ImageProps, "src"> & {
-  srcLight: string;
-  srcDark: string;
-};
-
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
-
-  return (
-    <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
-  );
-};
+import Link from "next/link";
+import { Phone, User, Users } from "lucide-react";
 
 export default function Home() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.com/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="container mx-auto px-4 py-16">
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold text-gray-900 dark:text-white mb-4">
+            Warm Transfer Demo
+          </h1>
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+            Experience seamless call transfers with AI-powered context sharing between agents.
+            Built with LiveKit, OpenAI, and Twilio.
+          </p>
         </div>
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.com?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to turborepo.com →
-        </a>
-      </footer>
+
+        <div className="max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-8">
+            {/* Caller Role */}
+            <Link href="/caller" className="group">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-200 dark:border-gray-700">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-blue-200 dark:group-hover:bg-blue-800 transition-colors">
+                    <Phone className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                    Join as Caller
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-300 mb-4">
+                    Start a call with Agent A and experience the warm transfer process.
+                  </p>
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      You'll be connected to Agent A first, then transferred to Agent B with full context.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            {/* Agent A Role */}
+            <Link href="/agent-a" className="group">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-200 dark:border-gray-700">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-green-200 dark:group-hover:bg-green-800 transition-colors">
+                    <User className="w-8 h-8 text-green-600 dark:text-green-400" />
+                  </div>
+                  <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                    Agent A
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-300 mb-4">
+                    Handle the initial call and initiate warm transfers to other agents.
+                  </p>
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
+                    <p className="text-sm text-green-800 dark:text-green-200">
+                      You can transfer calls to Agent B or real phone numbers via Twilio.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+
+            {/* Agent B Role */}
+            <Link href="/agent-b" className="group">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 border border-gray-200 dark:border-gray-700">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-purple-200 dark:group-hover:bg-purple-800 transition-colors">
+                    <Users className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                    Agent B
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-300 mb-4">
+                    Receive transferred calls with full context from Agent A.
+                  </p>
+                  <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3">
+                    <p className="text-sm text-purple-800 dark:text-purple-200">
+                      You'll receive AI-generated summaries of the previous conversation.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          </div>
+
+          <div className="mt-12 text-center">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 border border-gray-200 dark:border-gray-700">
+              <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">
+                How It Works
+              </h2>
+              <div className="grid md:grid-cols-4 gap-4 text-sm">
+                <div className="flex flex-col items-center">
+                  <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center mb-2">1</div>
+                  <p className="text-gray-600 dark:text-gray-300">Caller connects to Agent A</p>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center mb-2">2</div>
+                  <p className="text-gray-600 dark:text-gray-300">Agent A initiates transfer</p>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className="w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center mb-2">3</div>
+                  <p className="text-gray-600 dark:text-gray-300">AI generates call summary</p>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center mb-2">4</div>
+                  <p className="text-gray-600 dark:text-gray-300">Agent B receives context</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

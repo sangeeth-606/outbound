@@ -1,135 +1,206 @@
-# Turborepo starter
+# Warm Transfer Demo Application
 
-This Turborepo starter is maintained by the Turborepo core team.
+A comprehensive demonstration of warm call transfer functionality built with LiveKit, OpenAI, and Twilio. This application showcases seamless call transfers between agents with AI-powered context sharing.
 
-## Using this example
+## 🎯 Features
 
-Run the following command:
+- **Real-time Communication**: LiveKit-powered video/audio calls
+- **AI-Powered Summaries**: OpenAI GPT generates call context for transfers
+- **Phone Integration**: Twilio enables transfers to real phone numbers
+- **Interactive UI**: Next.js frontend with role-based interfaces
+- **Warm Transfer Flow**: Complete agent handoff with context preservation
 
-```sh
-npx create-turbo@latest
+## 🏗️ Architecture
+
+The application consists of:
+- **Backend**: Python FastAPI server handling room management, transfers, and API integrations
+- **Frontend**: Next.js application with role-based UI for Caller, Agent A, and Agent B
+- **LiveKit**: Real-time communication platform for audio/video calls
+- **OpenAI**: AI service for generating call summaries
+- **Twilio**: Telephony service for phone number integration
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Python 3.8+
+- Node.js 18+
+- LiveKit account and server
+- OpenAI API key
+- Twilio account (for phone integration)
+
+### 1. Backend Setup
+
+```bash
+cd backend
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Copy environment template
+cp env.example .env
+
+# Edit .env with your API keys
 ```
 
-## What's inside?
+**Required Environment Variables:**
+```env
+# LiveKit Configuration
+LIVEKIT_URL=wss://your-livekit-server.com
+LIVEKIT_API_KEY=your_livekit_api_key_here
+LIVEKIT_API_SECRET=your_livekit_api_secret_here
 
-This Turborepo includes the following packages/apps:
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key_here
 
-### Apps and Packages
+# Twilio Configuration
+TWILIO_ACCOUNT_SID=your_twilio_account_sid_here
+TWILIO_AUTH_TOKEN=your_twilio_auth_token_here
+TWILIO_PHONE_NUMBER=+1234567890
+TWILIO_TARGET_PHONE=+1234567890
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+# Webhook Configuration
+WEBHOOK_BASE_URL=https://yourdomain.com
 ```
 
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+### 2. Frontend Setup
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
+```bash
+cd apps/web
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+# Install dependencies
+npm install
 
-### Develop
+# Copy environment template
+cp env.local.example .env.local
 
-To develop all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+# Edit .env.local with your configuration
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+**Required Environment Variables:**
+```env
+# LiveKit Configuration
+NEXT_PUBLIC_LIVEKIT_URL=wss://your-livekit-server.com
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+# Backend API URL
+BACKEND_URL=http://localhost:8000
 ```
 
-### Remote Caching
+### 3. Run the Application
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
+**Terminal 1 - Backend:**
+```bash
+cd backend
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
+**Terminal 2 - Frontend:**
+```bash
+cd apps/web
+npm run dev
 ```
 
-## Useful Links
+The application will be available at:
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
 
-Learn more about the power of Turborepo:
+## 🎮 How to Demo
 
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+### Step 1: Role Selection
+1. Open http://localhost:3000
+2. Choose your role: Caller, Agent A, or Agent B
+
+### Step 2: Initial Call Setup
+1. **Caller**: Click "Start Call" to connect to Agent A
+2. **Agent A**: Click "Start Taking Calls" to connect to the system
+3. **Agent B**: Click "Connect to Transfer System" to wait for transfers
+
+### Step 3: Warm Transfer Process
+1. **Agent A** receives the caller
+2. **Agent A** clicks "Initiate Warm Transfer"
+3. System generates AI summary and creates transfer room
+4. **Agent A** is connected to transfer room with Agent B and Twilio call
+5. **Agent A** reads the AI-generated summary to provide context
+6. **Agent A** clicks "Complete Transfer" and exits
+7. **Agent B** and caller remain connected with full context
+
+## 🔧 API Endpoints
+
+### Backend API (FastAPI)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/room/create` | POST | Create LiveKit room and generate access token |
+| `/api/transfer/initiate` | POST | Initiate warm transfer with AI summary |
+| `/api/transfer/complete` | POST | Complete transfer and disconnect Agent A |
+| `/api/twilio/voice` | POST | Twilio webhook for phone call integration |
+
+### Frontend API Routes (Next.js)
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/api/room` | POST | Proxy to backend room creation |
+| `/api/transfer` | POST | Proxy to backend transfer operations |
+| `/api/twilio` | POST | Proxy to backend Twilio webhook |
+
+## 🛠️ Technical Details
+
+### LiveKit Integration
+- Real-time audio/video communication
+- Room-based participant management
+- Token-based authentication
+- WebRTC for low-latency streaming
+
+### AI-Powered Summaries
+- OpenAI GPT-3.5-turbo for call summarization
+- Context-aware prompts for warm transfer scenarios
+- Fallback summaries if AI service is unavailable
+
+### Twilio Integration
+- Programmable Voice API for phone calls
+- SIP REFER method for call transfers
+- TwiML responses for LiveKit room connection
+- Webhook handling for call events
+
+### Frontend Architecture
+- Next.js 14 with App Router
+- TypeScript for type safety
+- Tailwind CSS for styling
+- LiveKit client SDK for real-time features
+- Role-based UI components
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**LiveKit Connection Failed**
+- Verify LIVEKIT_URL is correct
+- Check API key and secret
+- Ensure LiveKit server is running
+
+**OpenAI API Errors**
+- Verify API key is valid
+- Check API quota and billing
+- Review rate limiting
+
+**Twilio Integration Issues**
+- Verify account credentials
+- Check phone number format
+- Ensure webhook URL is accessible
+
+**Frontend Build Errors**
+- Run `npm install` to update dependencies
+- Check Node.js version compatibility
+- Verify environment variables
+
+## 📚 Additional Resources
+
+- [LiveKit Documentation](https://docs.livekit.io/)
+- [OpenAI API Reference](https://platform.openai.com/docs)
+- [Twilio Voice API](https://www.twilio.com/docs/voice)
+- [Next.js Documentation](https://nextjs.org/docs)
+
+---
+
+**Built with ❤️ for demonstrating modern real-time communication and AI integration**
