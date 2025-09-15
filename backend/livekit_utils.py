@@ -2,6 +2,7 @@ import os
 import asyncio
 from livekit import api
 from livekit.api import AccessToken, VideoGrants
+from livekit.api.room_service import RoomService
 from livekit.rtc import Room, RoomOptions
 import logging
 
@@ -51,3 +52,47 @@ async def create_room(room_name: str) -> bool:
 def get_livekit_url() -> str:
     """Get the LiveKit server URL"""
     return os.getenv("LIVEKIT_URL", "wss://your-livekit-server.com")
+
+async def disconnect_participant(room_name: str, participant_identity: str) -> bool:
+    """Disconnect a participant from a room"""
+    try:
+        livekit_url = get_livekit_url()
+        api_key = os.getenv("LIVEKIT_API_KEY")
+        api_secret = os.getenv("LIVEKIT_API_SECRET")
+
+        client = RoomService(livekit_url, api_key, api_secret)
+        await client.remove_participant(room_name, participant_identity)
+        logger.info(f"Disconnected participant {participant_identity} from room {room_name}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to disconnect participant {participant_identity} from {room_name}: {str(e)}")
+        return False
+
+async def get_room_participants(room_name: str) -> list:
+    """Get list of participants in a room"""
+    try:
+        livekit_url = get_livekit_url()
+        api_key = os.getenv("LIVEKIT_API_KEY")
+        api_secret = os.getenv("LIVEKIT_API_SECRET")
+
+        client = RoomService(livekit_url, api_key, api_secret)
+        participants = await client.list_participants(room_name)
+        return [p.identity for p in participants]
+    except Exception as e:
+        logger.error(f"Failed to get participants for room {room_name}: {str(e)}")
+        return []
+
+async def delete_room(room_name: str) -> bool:
+    """Delete a room"""
+    try:
+        livekit_url = get_livekit_url()
+        api_key = os.getenv("LIVEKIT_API_KEY")
+        api_secret = os.getenv("LIVEKIT_API_SECRET")
+
+        client = RoomService(livekit_url, api_key, api_secret)
+        await client.delete_room(room_name)
+        logger.info(f"Deleted room {room_name}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to delete room {room_name}: {str(e)}")
+        return False

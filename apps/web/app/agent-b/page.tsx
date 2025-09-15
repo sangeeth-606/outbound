@@ -8,7 +8,7 @@ import {
   useTracks,
   RoomContext,
 } from '@livekit/components-react';
-import { Room, Track } from 'livekit-client';
+import { Room, Track, RoomEvent } from 'livekit-client';
 import '@livekit/components-styles';
 import { useEffect, useState } from 'react';
 import { Phone, MessageSquare, Users, PhoneOff, User } from 'lucide-react';
@@ -46,19 +46,28 @@ export default function AgentBPage() {
       
       if (data.token) {
         setToken(data.token);
-        await roomInstance.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, data.token);
+        await roomInstance.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://your-livekit-server.com', data.token);
         setIsConnected(true);
         setIsConnecting(false);
-        
+
+        // Set up data channel listener for transfer events
+        roomInstance.on(RoomEvent.DataReceived, (payload, participant) => {
+          try {
+            const data = JSON.parse(new TextDecoder().decode(payload));
+            if (data.type === 'transfer_initiated' && data.target_agent === 'agent_b') {
+              setTransferSummary(data.summary);
+              setIsWaitingForTransfer(false);
+              setTransferStatus('connected');
+            } else if (data.type === 'transfer_completed') {
+              setTransferStatus('completed');
+            }
+          } catch (e) {
+            console.error('Failed to parse data message:', e);
+          }
+        });
+
         // Wait for real transfer from Agent A
         // No automatic mock data - wait for actual transfer
-        
-        // Listen for transfer events (in a real implementation, this would be via WebSocket or data channels)
-        // For demo purposes, we'll simulate receiving a transfer after 5 seconds
-        setTimeout(() => {
-          // This would normally be triggered by Agent A's transfer initiation
-          console.log("Agent B is ready to receive transfers");
-        }, 1000);
       }
     } catch (e) {
       console.error('Connection error:', e);
@@ -217,13 +226,13 @@ export default function AgentBPage() {
                   </div>
                 )}
 
-                {transferSummary && (
+                {transferSummary && transferStatus === 'connected' && (
                   <div className="space-y-4">
                     <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4">
                       <h3 className="font-semibold text-blue-400 mb-2">Transfer Summary</h3>
                       <p className="text-gray-300 text-sm leading-relaxed">{transferSummary}</p>
                     </div>
-                    
+
                     <div className="bg-green-900/20 border border-green-500 rounded-lg p-4">
                       <h3 className="font-semibold text-green-400 mb-2">Transfer Active</h3>
                       <p className="text-gray-300 text-sm">
@@ -240,6 +249,18 @@ export default function AgentBPage() {
                         <li>• Escalate to Expert if required</li>
                       </ul>
                     </div>
+                  </div>
+                )}
+
+                {transferStatus === 'completed' && (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Users className="w-8 h-8 text-white" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-green-400 mb-2">Transfer Completed</h3>
+                    <p className="text-gray-500">
+                      The transfer has been successfully completed.
+                    </p>
                   </div>
                 )}
               </div>

@@ -24,6 +24,7 @@ class TransferInitiateResponse(BaseModel):
     summary: str
     agent_a_token: str
     agent_b_token: str
+    caller_token: str
     twilio_call_sid: Optional[str] = None
     target_agent: Optional[Dict[str, Any]] = None
 

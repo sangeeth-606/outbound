@@ -14,7 +14,9 @@ GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 def generate_call_summary(transcript_text: str, caller_type: str = "investor", context: Dict = None) -> str:
     """Generate a dynamic call summary using Groq LLM for warm transfer based on caller type"""
     try:
+        logger.info(f"🤖 Starting LLM summary generation for {caller_type}")
         if not GROQ_API_KEY:
+            logger.error("❌ Groq API key not found in environment variables")
             raise ValueError("Groq API key must be set in environment variables")
         
         # Dynamic prompts based on caller type and context
@@ -67,13 +69,14 @@ Arm the GP with key details to personalize their pitch. Keep under 3 sentences."
             "temperature": 0.7
         }
         
+        logger.info("📡 Sending request to Groq API...")
         response = requests.post(GROQ_API_URL, headers=headers, json=payload)
         response.raise_for_status()
-        
+
         result = response.json()
         summary = result["choices"][0]["message"]["content"].strip()
-        logger.info(f"Generated {caller_type} call summary using Groq: {summary}")
-        
+        logger.info(f"✅ Generated {caller_type} call summary using Groq: {summary[:100]}...")
+
         return summary
         
     except Exception as e:

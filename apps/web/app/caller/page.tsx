@@ -8,7 +8,7 @@ import {
   useTracks,
   RoomContext,
 } from '@livekit/components-react';
-import { Room, Track } from 'livekit-client';
+import { Room, Track, RoomEvent } from 'livekit-client';
 import '@livekit/components-styles';
 import { useEffect, useState } from 'react';
 import { Phone, MessageSquare, Users, PhoneOff, User } from 'lucide-react';
@@ -28,6 +28,8 @@ export default function CallerPage() {
   const [showChat, setShowChat] = useState(false);
   const [callerType, setCallerType] = useState('investor');
   const [email, setEmail] = useState('');
+  const [transferStatus, setTransferStatus] = useState<'idle' | 'in_progress' | 'completed'>('idle');
+  const [transferMessage, setTransferMessage] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -50,9 +52,25 @@ export default function CallerPage() {
       
       if (data.token) {
         setToken(data.token);
-        await roomInstance.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL, data.token);
+        await roomInstance.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://your-livekit-server.com', data.token);
         setIsConnected(true);
         setIsConnecting(false);
+
+        // Set up data channel listener for transfer events
+        roomInstance.on(RoomEvent.DataReceived, (payload, participant) => {
+          try {
+            const data = JSON.parse(new TextDecoder().decode(payload));
+            if (data.type === 'transfer_initiated') {
+              setTransferStatus('in_progress');
+              setTransferMessage('Your call is being transferred to a specialist. Please hold...');
+            } else if (data.type === 'transfer_completed') {
+              setTransferStatus('completed');
+              setTransferMessage('Transfer completed. You are now connected to a specialist.');
+            }
+          } catch (e) {
+            console.error('Failed to parse data message:', e);
+          }
+        });
       }
     } catch (e) {
       console.error('Connection error:', e);
@@ -165,7 +183,7 @@ export default function CallerPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="h-[600px]">
                 <ChatInterface 
-                  callerType={callerType}
+                  callerType={callerType as "investor" | "prospect"}
                   email={email}
                 />
               </div>
@@ -218,6 +236,19 @@ export default function CallerPage() {
                 <ControlBar />
               </div>
             </div>
+
+            {transferMessage && (
+              <div className="mt-4 bg-blue-900/20 border border-blue-500 rounded-lg p-4">
+                <h3 className="font-semibold text-blue-400 mb-2">Transfer Status</h3>
+                <p className="text-gray-300 text-sm">{transferMessage}</p>
+                {transferStatus === 'in_progress' && (
+                  <div className="mt-2 flex items-center space-x-2">
+                    <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                    <span className="text-sm text-gray-400">Transferring...</span>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="mt-6 text-center">
               <button

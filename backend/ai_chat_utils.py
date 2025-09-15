@@ -5,9 +5,9 @@ from typing import Dict, Any, List, Optional
 
 def get_groq_client():
     """Get Groq API key from environment"""
-    api_key = os.getenv("GROQ_API_KEY")
+    api_key = os.getenv("groq_key")
     if not api_key:
-        raise ValueError("GROQ_API_KEY environment variable is required")
+        raise ValueError("groq_key environment variable is required")
     return api_key
 
 def generate_ai_response(
