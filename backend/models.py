@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
+from datetime import datetime
 
 class CreateRoomRequest(BaseModel):
     room_name: str
@@ -11,6 +12,9 @@ class CreateRoomResponse(BaseModel):
     room_name: str
     access_token: str
     caller_context: Optional[Dict[str, Any]] = None
+    queue_status: str = "connected"  # "connected", "waiting", "no_agents"
+    queue_position: Optional[int] = None
+    estimated_wait_time: Optional[int] = None  # in seconds
 
 class TransferInitiateRequest(BaseModel):
     original_room_name: str
@@ -71,3 +75,78 @@ class TranscribeResponse(BaseModel):
     ai_response: Optional[str] = None
     conversation_history: Optional[List[ChatMessage]] = None
     error: Optional[str] = None
+
+# Queue System Models
+class QueueEntry(BaseModel):
+    email: str
+    caller_type: str
+    timestamp: datetime
+    status: str = "waiting"  # "waiting", "connecting", "connected"
+
+class AgentStatus(BaseModel):
+    agent_id: str
+    status: str = "offline"  # "offline", "available", "busy"
+    current_customer: Optional[str] = None  # email of customer being served
+
+class QueueStatusRequest(BaseModel):
+    email: str
+
+class QueueStatusResponse(BaseModel):
+    position: int
+    estimated_wait_time: int  # in seconds
+    total_waiting: int
+    agents_available: int
+    access_token: Optional[str] = None
+    room_name: Optional[str] = None
+
+class AgentAvailabilityRequest(BaseModel):
+    agent_id: str
+    status: str  # "available", "busy", "offline"
+
+class AgentAvailabilityResponse(BaseModel):
+    success: bool
+    message: str
+
+class PickNextCustomerRequest(BaseModel):
+    agent_id: str
+
+class PickNextCustomerResponse(BaseModel):
+    success: bool
+    customer: Optional[Dict[str, Any]] = None
+    room_name: Optional[str] = None
+    access_token: Optional[str] = None
+    message: str
+
+# Transcription Models
+class TranscriptionSegment(BaseModel):
+    id: str
+    room_name: str
+    speaker: str  # "agent_a", "customer", etc.
+    text: str
+    timestamp: str
+    confidence: Optional[float] = None
+    is_final: bool = True
+    words: Optional[List[Dict[str, Any]]] = None
+
+class StartTranscriptionRequest(BaseModel):
+    room_name: str
+    agent_id: str
+
+class StartTranscriptionResponse(BaseModel):
+    success: bool
+    message: str
+
+class StopTranscriptionRequest(BaseModel):
+    room_name: str
+
+class StopTranscriptionResponse(BaseModel):
+    success: bool
+    message: str
+
+class GetTranscriptionRequest(BaseModel):
+    room_name: str
+
+class GetTranscriptionResponse(BaseModel):
+    success: bool
+    transcripts: List[TranscriptionSegment]
+    message: str

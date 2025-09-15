@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
@@ -11,10 +11,16 @@ from dotenv import load_dotenv
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from livekit_utils import create_room_token, create_room, disconnect_participant, get_room_participants, delete_room
+from livekit_utils import create_room_token, create_room, disconnect_participant, get_room_participants, delete_room, start_room_transcription, stop_room_transcription, is_room_transcription_active
 from twilio_utils import initiate_twilio_call, initiate_warm_transfer_call, get_call_status, handle_call_status_callback, generate_twiml_response
 from llm_utils import generate_call_summary
-from db_utils import get_caller_context, get_agent_by_role
+from db_utils import (
+    get_caller_context, get_agent_by_role,
+    add_customer_to_queue, get_queue_position, get_next_customer,
+    get_queue_length, get_available_agents_count, update_agent_status,
+    get_agent_status, remove_customer_from_queue, get_estimated_wait_time,
+    get_room_transcriptions, get_transcription_summary
+)
 from deepgram_utils import transcribe_base64_audio
 from ai_chat_utils import generate_ai_response, create_conversation_entry
 from models import (
@@ -23,15 +29,33 @@ from models import (
     TransferCompleteRequest, TransferCompleteResponse,
     CallerContextRequest, CallerContextResponse,
     ChatRequest, ChatResponse, TranscribeRequest, TranscribeResponse,
-    ChatMessage
+    ChatMessage,
+    QueueStatusRequest, QueueStatusResponse,
+    AgentAvailabilityRequest, AgentAvailabilityResponse,
+    PickNextCustomerRequest, PickNextCustomerResponse,
+    StartTranscriptionRequest, StartTranscriptionResponse,
+    StopTranscriptionRequest, StopTranscriptionResponse,
+    GetTranscriptionRequest, GetTranscriptionResponse
 )
 import asyncio
 from fastapi import WebSocket
 from typing import List
 import json
+from datetime import datetime
 
 # WebSocket connections for real-time notifications
 websocket_connections: List[WebSocket] = []
+
+# In-memory storage for pending transfers (in production, use a database)
+pending_transfers = {}
+
+# In-memory storage for customer assignments to ensure HTTP fallback delivery
+# Keyed by customer email → { room_name, customer_token }
+assigned_customers = {}
+
+# Targeted WebSocket maps for customers and agents
+customer_sockets = {}
+agent_sockets = {}
 
 async def speak_summary(room_name: str, summary: str):
     """Simulate speaking the call summary in the room (in real implementation, use TTS)"""
@@ -69,19 +93,92 @@ async def websocket_notifications(websocket: WebSocket):
     await websocket.accept()
     websocket_connections.append(websocket)
     logger.info(f"📊 Total WebSocket connections: {len(websocket_connections)}")
+    
+    # Store connection type for targeted messaging
+    connection_info = {
+        "websocket": websocket,
+        "type": "unknown",  # Will be updated when client identifies itself
+        "email": None,
+        "agent_id": None
+    }
+    
     try:
         while True:
-            # Keep the connection alive
+            # Receive and process identification messages
             data = await websocket.receive_text()
             logger.debug(f"📨 WebSocket received: {data}")
-            # Echo back for testing
-            await websocket.send_text(f"Echo: {data}")
+            
+            try:
+                message = json.loads(data)
+                
+                # Handle client identification
+                if "email" in message:
+                    connection_info["type"] = "customer"
+                    connection_info["email"] = message["email"]
+                    logger.info(f"👤 Customer identified: {message['email']}")
+                    customer_sockets[message["email"]] = websocket
+                    
+                elif "agent_id" in message:
+                    connection_info["type"] = "agent"
+                    connection_info["agent_id"] = message["agent_id"]
+                    logger.info(f"👔 Agent identified: {message['agent_id']}")
+                    agent_sockets[message["agent_id"]] = websocket
+                    
+                # Send acknowledgment instead of echo
+                await websocket.send_text(json.dumps({
+                    "type": "acknowledgment",
+                    "message": "Message received",
+                    "timestamp": datetime.now().isoformat()
+                }))
+                
+            except json.JSONDecodeError:
+                logger.warning(f"Received non-JSON message: {data}")
+                # Send error response in JSON format
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "message": "Invalid JSON format"
+                }))
+                
+    except WebSocketDisconnect:
+        logger.info("🔌 WebSocket client disconnected normally")
     except Exception as e:
         logger.error(f"❌ WebSocket error: {e}")
     finally:
         if websocket in websocket_connections:
             websocket_connections.remove(websocket)
+        # Cleanup targeted maps
+        try:
+            if connection_info.get("email") and customer_sockets.get(connection_info["email"]) is websocket:
+                del customer_sockets[connection_info["email"]]
+        except Exception:
+            pass
+        try:
+            if connection_info.get("agent_id") and agent_sockets.get(connection_info["agent_id"]) is websocket:
+                del agent_sockets[connection_info["agent_id"]]
+        except Exception:
+            pass
         logger.info(f"🔌 WebSocket connection closed. Total connections: {len(websocket_connections)}")
+
+# Targeted send helpers with broadcast fallback
+async def send_to_customer(email: str, message: dict):
+    ws = customer_sockets.get(email)
+    if ws:
+        try:
+            await ws.send_json(message)
+            return
+        except Exception:
+            pass
+    await broadcast_websocket_message(message)
+
+async def send_to_agent(agent_id: str, message: dict):
+    ws = agent_sockets.get(agent_id)
+    if ws:
+        try:
+            await ws.send_json(message)
+            return
+        except Exception:
+            pass
+    await broadcast_websocket_message(message)
 
 # CORS middleware for frontend communication
 app.add_middleware(
@@ -92,15 +189,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mock conversation history for demo purposes
-MOCK_CONVERSATION_HISTORY = """
-Customer (John Doe) called about a login issue with their account. 
-I (Agent Alice) verified that his account is active and not locked. 
-I had him reset his password through the email verification process. 
-He reported that the password reset worked successfully, but now he can't see his dashboard after logging in. 
-He mentioned this is urgent as he needs to access his financial data for a meeting this afternoon.
-The customer seems frustrated but cooperative. I've already checked his account permissions and they appear correct.
-"""
+# Removed mock conversation history
+# TODO: Implement conversation history storage and retrieval from database
 
 @app.get("/")
 async def root():
@@ -118,24 +208,22 @@ async def debug_env():
 
 @app.post("/api/room/create", response_model=CreateRoomResponse)
 async def create_room_endpoint(request: CreateRoomRequest):
-    """Create a new LiveKit room and generate access token for participant with caller context"""
+    """Create a new LiveKit room and generate access token for participant with caller context and queue management"""
     try:
-        # Create room if it doesn't exist
-        await create_room(request.room_name)
+        # Always add customer to queue first, regardless of agent availability
+        # This ensures proper queue management and agent-controlled connections
+        position = add_customer_to_queue(request.email, request.caller_type)
+        estimated_wait = get_estimated_wait_time(position)
         
-        # Generate access token
-        access_token = create_room_token(
-            room_name=request.room_name,
-            participant_identity=request.participant_identity
-        )
-        
-        # Get caller context from mock database
-        caller_context = get_caller_context(request.email, request.caller_type)
-        
+        logger.info(f"Customer {request.email} added to queue at position {position}")
+
         return CreateRoomResponse(
             room_name=request.room_name,
-            access_token=access_token,
-            caller_context=caller_context
+            access_token="",  # No token yet - customer must wait for agent to pick them
+            caller_context=None,
+            queue_status="waiting",
+            queue_position=position,
+            estimated_wait_time=estimated_wait
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create room: {str(e)}")
@@ -160,10 +248,46 @@ async def initiate_transfer(request: TransferInitiateRequest):
 
         logger.info(f"👤 Target agent: {target_agent}")
 
-        # Generate dynamic call summary using LLM with context
+        # Generate dynamic call summary using LLM with transcription context
         logger.info("🤖 Generating call summary with LLM...")
+
+        # Check transcription status and handle errors
+        transcription_active = is_room_transcription_active(request.original_room_name)
+        transcription_segments = get_room_transcriptions(request.original_room_name)
+        transcription_summary = get_transcription_summary(request.original_room_name)
+
+        # Error handling for transcription failures
+        if transcription_active and not transcription_segments:
+            logger.warning(f"⚠️  Transcription was active for room {request.original_room_name} but no segments found - possible transcription failure")
+            conversation_context = "Transcription service encountered an issue during the call. Customer conversation context may be incomplete."
+        elif transcription_segments:
+            # Create rich context with timestamps and speakers
+            conversation_context = f"Call transcription with {len(transcription_segments)} segments:\n"
+            for segment in transcription_segments[-10:]:  # Last 10 segments for context
+                speaker = segment.get('speaker', 'unknown')
+                text = segment.get('text', '').strip()
+                timestamp = segment.get('timestamp', 'unknown')
+                if text:
+                    conversation_context += f"[{timestamp}] {speaker}: {text}\n"
+
+            # Add summary if available
+            if transcription_summary:
+                conversation_context += f"\nSummary: {transcription_summary}"
+
+            logger.info(f"📝 Using detailed transcription context: {len(transcription_segments)} segments")
+        elif transcription_summary:
+            conversation_context = transcription_summary
+            logger.info(f"📝 Using transcription summary: {transcription_summary[:100]}...")
+        else:
+            if transcription_active:
+                conversation_context = "Transcription service failed to capture conversation. Please ask the customer to repeat key details."
+                logger.error(f"❌ Transcription active but no data captured for room {request.original_room_name}")
+            else:
+                conversation_context = "Customer conversation context not available - transcription was not started for this call"
+                logger.info("📝 No transcription data available, using fallback context")
+
         summary = generate_call_summary(
-            MOCK_CONVERSATION_HISTORY,
+            conversation_context,
             request.caller_type,
             caller_context
         )
@@ -178,7 +302,7 @@ async def initiate_transfer(request: TransferInitiateRequest):
         logger.info("🎫 Generating access tokens for all participants")
         agent_a_token = create_room_token(
             room_name=transfer_room_name,
-            participant_identity=f"agent_a_{request.agent_a_id}"
+            participant_identity=f"agent_{request.agent_a_id}"
         )
 
         agent_b_token = create_room_token(
@@ -193,7 +317,26 @@ async def initiate_transfer(request: TransferInitiateRequest):
 
         # Disconnect Agent A from original room
         logger.info(f"👋 Disconnecting Agent A from original room: {request.original_room_name}")
-        await disconnect_participant(request.original_room_name, f"agent_a_{request.agent_a_id}")
+        await disconnect_participant(request.original_room_name, f"agent_{request.agent_a_id}")
+
+        # Send message to customer to switch to transfer room
+        logger.info(f"📢 Notifying customer to switch to transfer room: {transfer_room_name}")
+        customer_switch_message = {
+            "type": "switch_to_transfer_room",
+            "transfer_room_name": transfer_room_name,
+            "caller_token": caller_token,
+            "summary": summary,
+            "agent_a_id": request.agent_a_id
+        }
+        # Note: In a real implementation, you'd send this via LiveKit data channel to the customer
+        # For now, we'll broadcast it via WebSocket
+        await broadcast_websocket_message({
+            "type": "customer_room_switch",
+            "original_room": request.original_room_name,
+            "transfer_room": transfer_room_name,
+            "caller_token": caller_token,
+            "summary": summary
+        })
 
         # Speak the call summary in the transfer room
         await speak_summary(transfer_room_name, summary)
@@ -223,16 +366,54 @@ async def initiate_transfer(request: TransferInitiateRequest):
                 logger.error(f"❌ Twilio call failed (non-critical): {e}")
                 # Continue with web transfer even if Twilio fails
 
-        # Broadcast transfer initiation notification
-        logger.info("📡 Broadcasting transfer initiation via WebSocket")
+        # Broadcast transfer initiation notification to Agent B in waiting room
+        logger.info("📡 Broadcasting transfer initiation to Agent B waiting room")
         notification = {
             "type": "transfer_initiated",
             "original_room": request.original_room_name,
             "transfer_room": transfer_room_name,
             "agent_a": request.agent_a_id,
-            "target_agent": target_agent
+            "target_agent": target_agent,
+            "summary": summary,
+            "agent_b_token": agent_b_token
         }
         await broadcast_websocket_message(notification)
+
+        # Determine transcription status for error handling
+        transcription_status = "none"
+        transcription_error = None
+
+        if transcription_active and not transcription_segments:
+            transcription_status = "failed"
+            transcription_error = "Transcription was active but failed to capture data"
+        elif transcription_segments:
+            transcription_status = "success"
+        elif transcription_active:
+            transcription_status = "active_no_data"
+        else:
+            transcription_status = "not_started"
+
+        # Store transfer information for Agent B to retrieve
+        transfer_data = {
+            'transfer_room_name': transfer_room_name,
+            'summary': summary,
+            'agent_b_token': agent_b_token,
+            'agent_a_id': request.agent_a_id,
+            'timestamp': datetime.now().isoformat(),
+            'transcription_context': {
+                'segments': transcription_segments[-20:] if transcription_segments else [],  # Last 20 segments
+                'total_segments': len(transcription_segments) if transcription_segments else 0,
+                'transcription_active': transcription_active,
+                'transcription_status': transcription_status,
+                'transcription_error': transcription_error,
+                'summary_text': transcription_summary
+            },
+            'caller_info': {
+                'email': request.email,
+                'caller_type': request.caller_type
+            }
+        }
+        pending_transfers['agent_b'] = transfer_data
 
         logger.info(f"🎉 Transfer initiated successfully: {transfer_room_name}")
         return TransferInitiateResponse(
@@ -285,6 +466,201 @@ async def get_caller_context_endpoint(request: CallerContextRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get caller context: {str(e)}")
+
+# Queue Management Endpoints
+@app.post("/api/queue/status", response_model=QueueStatusResponse)
+async def get_queue_status(request: QueueStatusRequest):
+    """Get customer's current queue status"""
+    try:
+        position = get_queue_position(request.email)
+        if position is None:
+            raise HTTPException(status_code=404, detail="Customer not found in queue")
+
+        estimated_wait = get_estimated_wait_time(position)
+        total_waiting = get_queue_length()
+        agents_available = get_available_agents_count()
+
+        # If this customer was already assigned via WebSocket flow, return token immediately
+        if request.email in assigned_customers:
+            info = assigned_customers.pop(request.email)
+            return QueueStatusResponse(
+                position=0,
+                estimated_wait_time=0,
+                total_waiting=get_queue_length(),
+                agents_available=get_available_agents_count(),
+                access_token=info.get("customer_token", ""),
+                room_name=info.get("room_name", "support_room")
+            )
+
+        # If position is 1 and agents available, connect immediately
+        access_token = ""
+        room_name = "support_room"  # default
+        if position == 1 and agents_available > 0:
+            # Select agent (demo: agent_a)
+            selected_agent = "agent_a"
+            if get_agent_status(selected_agent) and get_agent_status(selected_agent).get("status") == "available":
+                # Pop customer from queue
+                next_customer = get_next_customer()
+                if next_customer and next_customer['email'] == request.email:
+                    # Create dynamic room
+                    room_name = f"support_{selected_agent}_{next_customer['email'].replace('@', '_').replace('.', '_')}"
+                    await create_room(room_name)
+
+                    # Generate customer token
+                    access_token = create_room_token(room_name, f"customer_{next_customer['email']}")
+
+                    # Update agent busy
+                    update_agent_status(selected_agent, "busy", next_customer['email'])
+
+                    # Broadcast to agent
+                    agent_token = create_room_token(room_name, f"agent_{selected_agent}")
+                    agent_notification = {
+                        "type": "customer_assigned",
+                        "agent_id": selected_agent,
+                        "customer_email": next_customer['email'],
+                        "room_name": room_name,
+                        "agent_token": agent_token
+                    }
+                    await send_to_agent(selected_agent, agent_notification)
+
+                    logger.info(f"Queue connect: assigned {request.email} to {selected_agent} in {room_name}")
+
+                    # Store assignment for HTTP fallback to the specific customer
+                    assigned_customers[next_customer['email']] = {
+                        "room_name": room_name,
+                        "customer_token": access_token
+                    }
+
+                    # Update position to 0 (connected)
+                    position = 0
+                    estimated_wait = 0
+
+        return QueueStatusResponse(
+            position=position,
+            estimated_wait_time=estimated_wait,
+            total_waiting=total_waiting,
+            agents_available=agents_available,
+            access_token=access_token if position == 0 else "",
+            room_name=room_name if position == 0 else "support_room"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get queue status: {str(e)}")
+
+@app.post("/api/agent/availability", response_model=AgentAvailabilityResponse)
+async def update_agent_availability(request: AgentAvailabilityRequest):
+    """Update agent availability status"""
+    try:
+        update_agent_status(request.agent_id, request.status)
+
+        # If agent becomes available, try to connect them with next customer
+        if request.status == "available":
+            next_customer = get_next_customer()
+            if next_customer:
+                logger.info(f"Agent {request.agent_id} available, popping customer {next_customer['email']}")
+                # Create room for this customer-agent pair
+                room_name = f"support_{request.agent_id}_{next_customer['email'].replace('@', '_').replace('.', '_')}"
+                await create_room(room_name)
+
+                # Generate tokens
+                agent_token = create_room_token(room_name, f"agent_{request.agent_id}")
+                customer_token = create_room_token(room_name, f"customer_{next_customer['email']}")
+
+                # Update agent status to busy
+                update_agent_status(request.agent_id, "busy", next_customer['email'])
+
+                # Targeted notify agent for auto-join
+                notification = {
+                    "type": "customer_assigned",
+                    "agent_id": request.agent_id,
+                    "customer_email": next_customer['email'],
+                    "room_name": room_name,
+                    "agent_token": agent_token
+                }
+                await send_to_agent(request.agent_id, notification)
+
+                # Notify customer with token directly
+                customer_notification = {
+                    "type": "agent_assigned",
+                    "email": next_customer['email'],
+                    "room_name": room_name,
+                    "customer_token": customer_token
+                }
+                await send_to_customer(next_customer['email'], customer_notification)
+
+                return AgentAvailabilityResponse(
+                    success=True,
+                    message=f"Connected to customer {next_customer['email']} in room {room_name}"
+                )
+
+        return AgentAvailabilityResponse(
+            success=True,
+            message=f"Agent {request.agent_id} status updated to {request.status}"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update agent availability: {str(e)}")
+
+@app.post("/api/agent/pick-next", response_model=PickNextCustomerResponse)
+async def pick_next_customer(request: PickNextCustomerRequest):
+    """Agent picks next customer from queue"""
+    try:
+        # Check if agent is available
+        agent_status = get_agent_status(request.agent_id)
+        if not agent_status or agent_status.get("status") != "available":
+            return PickNextCustomerResponse(
+                success=False,
+                message="Agent is not available to take calls"
+            )
+
+        # Get next customer from queue
+        next_customer = get_next_customer()
+        if not next_customer:
+            return PickNextCustomerResponse(
+                success=False,
+                message="No customers in queue"
+            )
+
+        # Create room for this customer-agent pair
+        room_name = f"support_{request.agent_id}_{next_customer['email'].replace('@', '_').replace('.', '_')}"
+        await create_room(room_name)
+        logger.info(f"Pick-next for {request.agent_id}: customer {next_customer['email']}, room: {room_name}")
+
+        # Generate tokens
+        agent_token = create_room_token(room_name, f"agent_{request.agent_id}")
+        customer_token = create_room_token(room_name, f"customer_{next_customer['email']}")
+
+        # Update agent status to busy
+        update_agent_status(request.agent_id, "busy", next_customer['email'])
+
+        # Targeted notify agent for auto-join
+        notification = {
+            "type": "customer_assigned",
+            "agent_id": request.agent_id,
+            "customer_email": next_customer['email'],
+            "room_name": room_name,
+            "agent_token": agent_token
+        }
+        await send_to_agent(request.agent_id, notification)
+
+        # Notify customer with token directly
+        customer_notification = {
+            "type": "agent_assigned",
+            "email": next_customer['email'],
+            "room_name": room_name,
+            "customer_token": customer_token
+        }
+        await send_to_customer(next_customer['email'], customer_notification)
+
+        return PickNextCustomerResponse(
+            success=True,
+            customer=next_customer,
+            room_name=room_name,
+            access_token=agent_token,
+            message=f"Connected to customer {next_customer['email']}"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to pick next customer: {str(e)}")
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
@@ -410,14 +786,14 @@ async def generate_call_summary_endpoint(request: dict):
         conversation_context = request.get("conversation_context", "")
         caller_type = request.get("caller_type", "general")
         caller_info = request.get("caller_info", {})
-        
+
         # Generate AI summary using Groq
         summary = generate_call_summary(
-            conversation_context, 
-            caller_type, 
+            conversation_context,
+            caller_type,
             caller_info
         )
-        
+
         return {
             "success": True,
             "summary": summary,
@@ -427,6 +803,53 @@ async def generate_call_summary_endpoint(request: dict):
         return {
             "success": False,
             "summary": "Failed to generate call summary. Please try again.",
+            "error": str(e)
+        }
+
+@app.get("/api/agent/transfer-status/{agent_id}")
+async def get_agent_transfer_status(agent_id: str):
+    """Check if there's a pending transfer for a specific agent"""
+    try:
+        if agent_id in pending_transfers:
+            transfer_info = pending_transfers[agent_id]
+            return {
+                "success": True,
+                "has_pending_transfer": True,
+                "transfer_details": transfer_info,
+                "message": "Transfer available"
+            }
+        else:
+            return {
+                "success": True,
+                "has_pending_transfer": False,
+                "transfer_details": None,
+                "message": "No pending transfers"
+            }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "has_pending_transfer": False
+        }
+
+@app.delete("/api/agent/transfer-status/{agent_id}")
+async def clear_agent_transfer_status(agent_id: str):
+    """Clear pending transfer for a specific agent"""
+    try:
+        if agent_id in pending_transfers:
+            del pending_transfers[agent_id]
+            return {
+                "success": True,
+                "message": f"Transfer cleared for agent {agent_id}"
+            }
+        else:
+            return {
+                "success": True,
+                "message": f"No pending transfer found for agent {agent_id}"
+            }
+    except Exception as e:
+        return {
+            "success": False,
             "error": str(e)
         }
 
@@ -520,80 +943,35 @@ async def cleanup_room(request: dict):
 async def get_analytics_data(time_range: str = "7d"):
     """Get analytics data for dashboard"""
     try:
-        # Mock analytics data - in production, this would query your database
-        base_data = {
+        # TODO: Replace with actual database queries for analytics data
+        # For now, return empty data structure to indicate no mock data dependency
+        empty_data = {
             "transferStats": {
-                "totalTransfers": 156,
-                "successfulTransfers": 142,
-                "failedTransfers": 14,
-                "averageDuration": 8.5
+                "totalTransfers": 0,
+                "successfulTransfers": 0,
+                "failedTransfers": 0,
+                "averageDuration": 0
             },
             "callMetrics": {
-                "totalCalls": 892,
-                "averageCallDuration": 12.3,
-                "peakHours": [
-                    {"hour": "9:00", "calls": 45},
-                    {"hour": "10:00", "calls": 52},
-                    {"hour": "11:00", "calls": 48},
-                    {"hour": "14:00", "calls": 38},
-                    {"hour": "15:00", "calls": 42},
-                    {"hour": "16:00", "calls": 35}
-                ],
-                "callVolumeByDay": [
-                    {"date": "Mon", "calls": 120},
-                    {"date": "Tue", "calls": 135},
-                    {"date": "Wed", "calls": 142},
-                    {"date": "Thu", "calls": 128},
-                    {"date": "Fri", "calls": 156},
-                    {"date": "Sat", "calls": 98},
-                    {"date": "Sun", "calls": 113}
-                ]
+                "totalCalls": 0,
+                "averageCallDuration": 0,
+                "peakHours": [],
+                "callVolumeByDay": []
             },
-            "agentPerformance": [
-                {"agentId": "agent_a", "name": "Alice Johnson", "transfersHandled": 45, "successRate": 95.6, "averageHandleTime": 8.2},
-                {"agentId": "agent_b", "name": "Bob Smith", "transfersHandled": 38, "successRate": 92.1, "averageHandleTime": 9.1},
-                {"agentId": "agent_c", "name": "Carol Davis", "transfersHandled": 52, "successRate": 98.1, "averageHandleTime": 7.8}
-            ],
+            "agentPerformance": [],
             "realTimeMetrics": {
-                "activeCalls": 12,
-                "waitingQueue": 3,
-                "averageWaitTime": 2.4
+                "activeCalls": 0,
+                "waitingQueue": 0,
+                "averageWaitTime": 0
             }
-        }
-
-        # Adjust data based on time range
-        if time_range == "1d":
-            # Reduce all numbers for 1-day view
-            multiplier = 0.1
-        elif time_range == "30d":
-            multiplier = 4.3
-        elif time_range == "90d":
-            multiplier = 13
-        else:  # 7d
-            multiplier = 1
-
-        adjusted_data = {
-            "transferStats": {
-                "totalTransfers": int(base_data["transferStats"]["totalTransfers"] * multiplier),
-                "successfulTransfers": int(base_data["transferStats"]["successfulTransfers"] * multiplier),
-                "failedTransfers": int(base_data["transferStats"]["failedTransfers"] * multiplier),
-                "averageDuration": base_data["transferStats"]["averageDuration"]
-            },
-            "callMetrics": {
-                "totalCalls": int(base_data["callMetrics"]["totalCalls"] * multiplier),
-                "averageCallDuration": base_data["callMetrics"]["averageCallDuration"],
-                "peakHours": base_data["callMetrics"]["peakHours"],
-                "callVolumeByDay": base_data["callMetrics"]["callVolumeByDay"]
-            },
-            "agentPerformance": base_data["agentPerformance"],
-            "realTimeMetrics": base_data["realTimeMetrics"]
         }
 
         return {
             "success": True,
-            "data": adjusted_data,
+            "data": empty_data,
             "timeRange": time_range,
-            "timestamp": "2025-01-15T10:30:00Z"
+            "timestamp": "2025-01-15T10:30:00Z",
+            "message": "Analytics data not available - implement database integration"
         }
     except Exception as e:
         return {
@@ -606,57 +984,14 @@ async def get_analytics_data(time_range: str = "7d"):
 async def get_transfer_history(agent_id: str = None, limit: int = 20):
     """Get transfer history for agents"""
     try:
-        # Mock transfer history data
-        mock_transfers = [
-            {
-                "id": "1",
-                "timestamp": "2025-01-15T09:30:00Z",
-                "agentA": "Alice Johnson",
-                "agentB": "Bob Smith",
-                "callerEmail": "john.doe@example.com",
-                "callerType": "investor",
-                "status": "completed",
-                "duration": 420,
-                "summary": "Customer needed help with account login issues. Password reset completed successfully.",
-                "reason": "Technical support"
-            },
-            {
-                "id": "2",
-                "timestamp": "2025-01-15T08:15:00Z",
-                "agentA": "Alice Johnson",
-                "agentB": "Carol Davis",
-                "callerEmail": "jane.smith@example.com",
-                "callerType": "prospect",
-                "status": "completed",
-                "duration": 680,
-                "summary": "Prospect interested in investment opportunities. Discussed portfolio options and next steps.",
-                "reason": "Sales inquiry"
-            },
-            {
-                "id": "3",
-                "timestamp": "2025-01-15T07:45:00Z",
-                "agentA": "Alice Johnson",
-                "agentB": "Bob Smith",
-                "callerEmail": "mike.wilson@example.com",
-                "callerType": "investor",
-                "status": "failed",
-                "duration": 120,
-                "summary": "Customer had questions about recent market performance.",
-                "reason": "Connection lost"
-            }
-        ]
-
-        # Filter by agent if specified
-        if agent_id:
-            filtered_transfers = [t for t in mock_transfers if t["agentA"].lower().replace(" ", "_") == agent_id.lower()]
-        else:
-            filtered_transfers = mock_transfers
-
+        # TODO: Replace with actual database queries for transfer history
+        # For now, return empty list to indicate no mock data dependency
         return {
             "success": True,
-            "transfers": filtered_transfers[:limit],
-            "total": len(filtered_transfers),
-            "limit": limit
+            "transfers": [],
+            "total": 0,
+            "limit": limit,
+            "message": "Transfer history not available - implement database integration"
         }
     except Exception as e:
         return {
@@ -664,6 +999,72 @@ async def get_transfer_history(agent_id: str = None, limit: int = 20):
             "error": str(e),
             "message": "Failed to fetch transfer history"
         }
+
+# Transcription Endpoints
+@app.post("/api/transcription/start", response_model=StartTranscriptionResponse)
+async def start_transcription(request: StartTranscriptionRequest):
+    """Start real-time transcription for a room"""
+    try:
+        if is_room_transcription_active(request.room_name):
+            return StartTranscriptionResponse(
+                success=True,
+                message="Transcription already active for this room"
+            )
+
+        success = await start_room_transcription(request.room_name)
+        if success:
+            return StartTranscriptionResponse(
+                success=True,
+                message=f"Transcription started for room {request.room_name}"
+            )
+        else:
+            return StartTranscriptionResponse(
+                success=False,
+                message="Failed to start transcription"
+            )
+    except Exception as e:
+        return StartTranscriptionResponse(
+            success=False,
+            message=f"Failed to start transcription: {str(e)}"
+        )
+
+@app.post("/api/transcription/stop", response_model=StopTranscriptionResponse)
+async def stop_transcription(request: StopTranscriptionRequest):
+    """Stop real-time transcription for a room"""
+    try:
+        success = await stop_room_transcription(request.room_name)
+        if success:
+            return StopTranscriptionResponse(
+                success=True,
+                message=f"Transcription stopped for room {request.room_name}"
+            )
+        else:
+            return StopTranscriptionResponse(
+                success=False,
+                message="Failed to stop transcription"
+            )
+    except Exception as e:
+        return StopTranscriptionResponse(
+            success=False,
+            message=f"Failed to stop transcription: {str(e)}"
+        )
+
+@app.post("/api/transcription/get", response_model=GetTranscriptionResponse)
+async def get_transcription(request: GetTranscriptionRequest):
+    """Get transcription data for a room"""
+    try:
+        transcripts = get_room_transcriptions(request.room_name)
+        return GetTranscriptionResponse(
+            success=True,
+            transcripts=transcripts,
+            message=f"Retrieved {len(transcripts)} transcription segments"
+        )
+    except Exception as e:
+        return GetTranscriptionResponse(
+            success=False,
+            transcripts=[],
+            message=f"Failed to get transcription: {str(e)}"
+        )
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

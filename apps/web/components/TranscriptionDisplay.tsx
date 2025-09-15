@@ -27,60 +27,98 @@ export default function TranscriptionDisplay({
   const [isRecording, setIsRecording] = useState(false);
   const [currentTranscript, setCurrentTranscript] = useState<string>('');
   const [isListening, setIsListening] = useState(false);
+  const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  // Mock transcription data for demo
-  const mockTranscripts: TranscriptMessage[] = [
-    {
-      id: '1',
-      speaker: 'customer',
-      text: 'Hi, I\'m having trouble accessing my account dashboard.',
-      timestamp: new Date(Date.now() - 30000),
-      confidence: 0.95
-    },
-    {
-      id: '2',
-      speaker: 'agent',
-      text: 'Hello! I\'d be happy to help you with that. Can you tell me what specific issue you\'re experiencing?',
-      timestamp: new Date(Date.now() - 25000),
-      confidence: 0.98
-    },
-    {
-      id: '3',
-      speaker: 'customer',
-      text: 'When I log in, I can see the login page but after that it just shows a blank screen.',
-      timestamp: new Date(Date.now() - 20000),
-      confidence: 0.92
-    },
-    {
-      id: '4',
-      speaker: 'agent',
-      text: 'I understand. Let me check your account status. Can you confirm your email address for me?',
-      timestamp: new Date(Date.now() - 15000),
-      confidence: 0.97
-    }
-  ];
+  // Removed mock transcription data for production
+  // TODO: Implement real-time transcription integration
 
   useEffect(() => {
     if (isActive && isRecording) {
-      // Simulate real-time transcription
-      const interval = setInterval(() => {
-        const words = ['Hello', 'I\'m', 'having', 'trouble', 'with', 'my', 'account'];
-        const randomWords = words.slice(0, Math.floor(Math.random() * words.length) + 1);
-        setCurrentTranscript(randomWords.join(' ') + '...');
-      }, 2000);
+      // Fetch transcription data periodically with error handling
+      const interval = setInterval(async () => {
+        try {
+          const response = await fetch('/api/transcription/get', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              room_name: roomName
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          if (data.success) {
+            setTranscripts(data.transcripts || []);
+            setTranscriptionError(null);
+            setRetryCount(0);
+
+            // Set current transcript to the latest final transcript
+            const finalTranscripts = (data.transcripts || []).filter((t: any) => t.is_final);
+            if (finalTranscripts.length > 0) {
+              setCurrentTranscript(finalTranscripts[finalTranscripts.length - 1].text);
+            }
+          } else {
+            throw new Error(data.message || 'Failed to fetch transcription data');
+          }
+        } catch (error) {
+          console.error('Failed to fetch transcription:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+          setTranscriptionError(`Transcription service error: ${errorMessage}`);
+
+          // Implement retry logic with exponential backoff
+          setRetryCount(prev => {
+            const newCount = prev + 1;
+            if (newCount >= 3) {
+              setTranscriptionError('Transcription service is unavailable. Please restart transcription.');
+            }
+            return newCount;
+          });
+        }
+      }, Math.min(2000 * Math.pow(1.5, retryCount), 10000)); // Exponential backoff, max 10s
 
       return () => clearInterval(interval);
     } else {
       setCurrentTranscript('');
+      setTranscriptionError(null);
+      setRetryCount(0);
     }
-  }, [isActive, isRecording]);
+  }, [isActive, isRecording, roomName, retryCount]);
 
   useEffect(() => {
     if (isActive) {
-      // Load mock transcripts
-      setTranscripts(mockTranscripts);
+      // Load existing transcription data
+      const loadTranscripts = async () => {
+        try {
+          const response = await fetch('/api/transcription/get', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              room_name: roomName
+            }),
+          });
+
+          const data = await response.json();
+          if (data.success) {
+            setTranscripts(data.transcripts);
+          }
+        } catch (error) {
+          console.error('Failed to load transcription:', error);
+          // Don't show error for missing transcription API - it's optional
+          setTranscripts([]);
+        }
+      };
+
+      loadTranscripts();
     }
-  }, [isActive]);
+  }, [isActive, roomName]);
 
   const toggleRecording = () => {
     const newRecordingState = !isRecording;
@@ -143,15 +181,39 @@ export default function TranscriptionDisplay({
           <motion.div
             animate={{
               scale: isRecording ? [1, 1.2, 1] : 1,
-              backgroundColor: isRecording ? '#EF4444' : '#6B7280'
+              backgroundColor: transcriptionError ? '#EF4444' : (isRecording ? '#EF4444' : '#6B7280')
             }}
-            transition={{ duration: 1, repeat: isRecording ? Infinity : 0 }}
+            transition={{ duration: 1, repeat: (isRecording && !transcriptionError) ? Infinity : 0 }}
             className="w-2 h-2 rounded-full"
           ></motion.div>
-          <span className={`text-sm ${isRecording ? 'text-red-400' : 'text-gray-400'}`}>
-            {isRecording ? 'Recording & Transcribing' : 'Ready to record'}
+          <span className={`text-sm ${
+            transcriptionError ? 'text-red-400' :
+            isRecording ? 'text-red-400' : 'text-gray-400'
+          }`}>
+            {transcriptionError ? 'Transcription Error' :
+             isRecording ? 'Recording & Transcribing' : 'Ready to record'}
           </span>
         </div>
+
+        {/* Error Display */}
+        {transcriptionError && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mt-3 p-3 bg-red-900/20 border border-red-500/30 rounded-lg"
+          >
+            <div className="flex items-center space-x-2">
+              <span className="text-red-400 text-sm">⚠️</span>
+              <span className="text-red-300 text-sm">{transcriptionError}</span>
+            </div>
+            {retryCount < 3 && (
+              <p className="text-red-400 text-xs mt-1">
+                Retrying... ({retryCount}/3)
+              </p>
+            )}
+          </motion.div>
+        )}
       </div>
 
       {/* Current Transcript */}

@@ -30,69 +30,8 @@ export default function TransferHistory({ agentId, limit = 20 }: TransferHistory
   const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'failed' | 'cancelled'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'duration'>('newest');
 
-  // Mock data for demonstration
-  const mockTransfers: TransferRecord[] = [
-    {
-      id: '1',
-      timestamp: new Date(Date.now() - 3600000), // 1 hour ago
-      agentA: 'Alice Johnson',
-      agentB: 'Bob Smith',
-      callerEmail: 'john.doe@example.com',
-      callerType: 'investor',
-      status: 'completed',
-      duration: 420,
-      summary: 'Customer needed help with account login issues. Password reset completed successfully.',
-      reason: 'Technical support'
-    },
-    {
-      id: '2',
-      timestamp: new Date(Date.now() - 7200000), // 2 hours ago
-      agentA: 'Alice Johnson',
-      agentB: 'Carol Davis',
-      callerEmail: 'jane.smith@example.com',
-      callerType: 'prospect',
-      status: 'completed',
-      duration: 680,
-      summary: 'Prospect interested in investment opportunities. Discussed portfolio options and next steps.',
-      reason: 'Sales inquiry'
-    },
-    {
-      id: '3',
-      timestamp: new Date(Date.now() - 10800000), // 3 hours ago
-      agentA: 'Alice Johnson',
-      agentB: 'Bob Smith',
-      callerEmail: 'mike.wilson@example.com',
-      callerType: 'investor',
-      status: 'failed',
-      duration: 120,
-      summary: 'Customer had questions about recent market performance.',
-      reason: 'Connection lost'
-    },
-    {
-      id: '4',
-      timestamp: new Date(Date.now() - 14400000), // 4 hours ago
-      agentA: 'Alice Johnson',
-      agentB: 'David Brown',
-      callerEmail: 'sarah.jones@example.com',
-      callerType: 'general',
-      status: 'cancelled',
-      duration: 45,
-      summary: 'General inquiry about company services.',
-      reason: 'Customer hung up'
-    },
-    {
-      id: '5',
-      timestamp: new Date(Date.now() - 18000000), // 5 hours ago
-      agentA: 'Alice Johnson',
-      agentB: 'Carol Davis',
-      callerEmail: 'tom.anderson@example.com',
-      callerType: 'investor',
-      status: 'completed',
-      duration: 950,
-      summary: 'Complex investment strategy discussion. Customer needed detailed analysis of portfolio performance.',
-      reason: 'Investment consultation'
-    }
-  ];
+  // Removed mock transfer data for production
+  // TODO: Implement real transfer history fetching from backend
 
   useEffect(() => {
     const fetchTransferHistory = async () => {
@@ -108,15 +47,15 @@ export default function TransferHistory({ agentId, limit = 20 }: TransferHistory
           setTransfers(formattedTransfers);
           setFilteredTransfers(formattedTransfers);
         } else {
-          // Fallback to mock data
-          setTransfers(mockTransfers);
-          setFilteredTransfers(mockTransfers);
+          // No fallback mock data - handle gracefully
+          setTransfers([]);
+          setFilteredTransfers([]);
         }
       } catch (error) {
         console.error('Failed to fetch transfer history:', error);
-        // Fallback to mock data
-        setTransfers(mockTransfers);
-        setFilteredTransfers(mockTransfers);
+        // No fallback mock data - handle gracefully
+        setTransfers([]);
+        setFilteredTransfers([]);
       }
       setLoading(false);
     };

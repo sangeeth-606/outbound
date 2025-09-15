@@ -48,16 +48,16 @@ export default function TestRoomPage() {
   }, [roomInstance]);
 
   if (token === '') {
-    return <div className="flex items-center justify-center h-screen">Getting token...</div>;
+    return <div className="flex items-center justify-center h-screen bg-white text-black">Getting token...</div>;
   }
 
   if (!isConnected) {
-    return <div className="flex items-center justify-center h-screen">Connecting to room...</div>;
+    return <div className="flex items-center justify-center h-screen bg-white text-black">Connecting to room...</div>;
   }
 
   return (
     <RoomContext.Provider value={roomInstance}>
-      <div data-lk-theme="default" style={{ height: '100dvh' }}>
+      <div data-lk-theme="default" style={{ height: '100dvh' }} className="bg-white text-black">
         {/* Your custom component with basic video conferencing functionality. */}
         <MyVideoConference />
         {/* The RoomAudioRenderer takes care of room-wide audio for you. */}

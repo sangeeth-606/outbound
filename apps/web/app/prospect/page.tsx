@@ -80,11 +80,11 @@ export default function ProspectPage() {
 
   if (isConnecting) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900 text-white flex items-center justify-center">
-        <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-8 max-w-md mx-auto border border-green-500/20">
-          <div className="animate-spin w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+      <div className="min-h-screen bg-white text-black flex items-center justify-center">
+        <div className="bg-gray-100 rounded-lg shadow-md p-8 max-w-md mx-auto border border-gray-200">
+          <div className="animate-spin w-8 h-8 border-2 border-black border-t-transparent rounded-full mx-auto mb-4"></div>
           <h2 className="text-xl font-semibold mb-2">Connecting...</h2>
-          <p className="text-gray-300">Please wait while we connect you to our investment team</p>
+          <p className="text-gray-600">Please wait while we connect you to our investment team</p>
         </div>
       </div>
     );
@@ -92,8 +92,8 @@ export default function ProspectPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900 text-white flex items-center justify-center">
-        <div className="bg-red-600/20 border border-red-500 text-red-200 p-4 rounded-lg max-w-md mx-auto">
+      <div className="min-h-screen bg-white text-black flex items-center justify-center">
+        <div className="bg-red-100 border border-red-400 text-red-700 p-4 rounded-lg max-w-md mx-auto">
           Error: {error}
         </div>
       </div>
@@ -102,24 +102,24 @@ export default function ProspectPage() {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900 text-white">
+      <div className="min-h-screen bg-white text-black">
         <div className="container mx-auto px-4 py-8">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              <Building2 className="w-8 h-8 text-green-400 mr-3" />
+              <Building2 className="w-8 h-8 text-black mr-3" />
               <h1 className="text-3xl font-bold">Investment Opportunities</h1>
             </div>
-            <p className="text-gray-300">Connect with our investment team to learn about opportunities</p>
+            <p className="text-gray-600">Connect with our investment team to learn about opportunities</p>
           </div>
 
           <div className="text-center">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-8 max-w-md mx-auto border border-green-500/20">
-              <TrendingUp className="w-16 h-16 text-green-400 mx-auto mb-4" />
+            <div className="bg-gray-100 rounded-lg shadow-md p-8 max-w-md mx-auto border border-gray-200">
+              <TrendingUp className="w-16 h-16 text-black mx-auto mb-4" />
               <h2 className="text-xl font-semibold mb-4">Start Your Investment Journey</h2>
               
               <div className="space-y-4 mb-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-600 mb-2">
                     Your Email Address
                   </label>
                   <input
@@ -127,7 +127,7 @@ export default function ProspectPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="prospect@example.com"
-                    className="w-full px-4 py-2 bg-white/10 border border-green-500/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500"
+                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-black placeholder-gray-400 focus:outline-none focus:border-black"
                   />
                 </div>
               </div>
@@ -135,7 +135,7 @@ export default function ProspectPage() {
               <div className="space-y-3">
                 <button
                   onClick={connectToCall}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                  className="w-full bg-black hover:bg-gray-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
                 >
                   Connect to Investment Team
                 </button>
@@ -156,7 +156,7 @@ export default function ProspectPage() {
 
   if (showChat) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900 text-white">
+      <div className="min-h-screen bg-white text-black">
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-6xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -166,12 +166,12 @@ export default function ProspectPage() {
                   email={email}
                 />
               </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-green-500/20">
+              <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
                 <h2 className="text-xl font-semibold mb-4">AI Investment Assistant</h2>
                 <div className="space-y-4">
-                  <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4">
-                    <h3 className="font-semibold text-blue-400 mb-2">Prospect Features</h3>
-                    <ul className="text-gray-300 text-sm space-y-1">
+                  <div className="bg-blue-100 border border-blue-400 rounded-lg p-4">
+                    <h3 className="font-semibold text-blue-700 mb-2">Prospect Features</h3>
+                    <ul className="text-gray-600 text-sm space-y-1">
                       <li>• Investment opportunity exploration</li>
                       <li>• Portfolio strategy guidance</li>
                       <li>• Risk assessment information</li>
@@ -181,9 +181,9 @@ export default function ProspectPage() {
                   </div>
                   
                   {prospectContext && (
-                    <div className="bg-green-900/20 border border-green-500 rounded-lg p-4">
-                      <h3 className="font-semibold text-green-400 mb-2">Your Profile</h3>
-                      <div className="text-gray-300 text-sm space-y-1">
+                    <div className="bg-green-100 border border-green-400 rounded-lg p-4">
+                      <h3 className="font-semibold text-green-700 mb-2">Your Profile</h3>
+                      <div className="text-gray-600 text-sm space-y-1">
                         <p><strong>Status:</strong> {prospectContext.status}</p>
                         <p><strong>Interest:</strong> {prospectContext.interest}</p>
                         <p><strong>Budget:</strong> {prospectContext.budget}</p>
@@ -209,20 +209,20 @@ export default function ProspectPage() {
 
   return (
     <RoomContext.Provider value={roomInstance}>
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-green-900 to-slate-900 text-white">
+      <div className="min-h-screen bg-white text-black">
         <div className="container mx-auto px-4 py-8">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              <Building2 className="w-8 h-8 text-green-400 mr-3" />
+              <Building2 className="w-8 h-8 text-black mr-3" />
               <h1 className="text-3xl font-bold">Investment Consultation</h1>
             </div>
-            <p className="text-gray-300">Connected to our investment team</p>
+            <p className="text-gray-600">Connected to our investment team</p>
           </div>
 
           <div className="max-w-6xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Video Conference */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-green-500/20">
+              <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
                 <h2 className="text-xl font-semibold mb-4">Investment Consultation</h2>
                 <div data-lk-theme="default" style={{ height: '400px' }}>
                   <MyVideoConference />
@@ -232,14 +232,14 @@ export default function ProspectPage() {
               </div>
 
               {/* Prospect Context */}
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg p-6 border border-green-500/20">
+              <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
                 <h2 className="text-xl font-semibold mb-4">Prospect Information</h2>
                 
                 {prospectContext ? (
                   <div className="space-y-4">
-                    <div className="bg-green-900/20 border border-green-500 rounded-lg p-4">
-                      <h3 className="font-semibold text-green-400 mb-2">Prospect Details</h3>
-                      <div className="text-gray-300 text-sm space-y-1">
+                    <div className="bg-green-100 border border-green-400 rounded-lg p-4">
+                      <h3 className="font-semibold text-black mb-2">Prospect Details</h3>
+                      <div className="text-gray-600 text-sm space-y-1">
                         <p><strong>Name:</strong> {prospectContext.name}</p>
                         <p><strong>Email:</strong> {prospectContext.email}</p>
                         <p><strong>Status:</strong> {prospectContext.status}</p>
@@ -250,8 +250,8 @@ export default function ProspectPage() {
                       </div>
                     </div>
                     
-                    <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4">
-                      <h3 className="font-semibold text-blue-400 mb-2">Consultation Options</h3>
+                    <div className="bg-blue-100 border border-blue-400 rounded-lg p-4">
+                      <h3 className="font-semibold text-black mb-2">Consultation Options</h3>
                       <div className="space-y-2">
                         <button
                           onClick={() => setShowChat(true)}
@@ -274,11 +274,11 @@ export default function ProspectPage() {
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <div className="w-16 h-16 bg-gray-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Users className="w-8 h-8 text-gray-400" />
+                    <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Users className="w-8 h-8 text-gray-500" />
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-400 mb-2">Loading Prospect Data</h3>
-                    <p className="text-gray-500">
+                    <h3 className="text-lg font-semibold text-gray-500 mb-2">Loading Prospect Data</h3>
+                    <p className="text-gray-400">
                       Your prospect information will appear here once connected.
                     </p>
                   </div>
