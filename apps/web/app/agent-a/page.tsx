@@ -16,6 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ChatInterface from '../../components/ChatInterface';
 import TranscriptionDisplay from '../../components/TranscriptionDisplay';
 import TransferHistory from '../../components/TransferHistory';
+import LiveKitChatInterface from '../../components/LiveKitChatInterface';
 
 export default function AgentAPage() {
   const room = 'support_room';
@@ -625,6 +626,20 @@ export default function AgentAPage() {
           <div className="mt-8">
             <TransferHistory agentId={name} />
           </div>
+          
+          {/* Live Chat Interface Preview */}
+          <div className="mt-8">
+            <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200 max-w-md mx-auto">
+              <h2 className="text-xl font-semibold mb-4">Live Chat Interface Preview</h2>
+              <p className="text-gray-600 mb-4 text-sm">This is how the chat will appear during customer calls:</p>
+              <div style={{ height: '400px' }}>
+                <LiveKitChatInterface 
+                  room={roomInstance}
+                  localUserType="agent"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -712,13 +727,25 @@ export default function AgentAPage() {
                 </div>
               </div>
 
+              {/* Live Chat Interface */}
+              <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
+                <h2 className="text-xl font-semibold mb-4 text-green-600">🔥 Live Chat</h2>
+                <div style={{ height: '400px' }}>
+                  <LiveKitChatInterface 
+                    room={roomInstance}
+                    localUserType="agent"
+                  />
+                </div>
+              </div>
+
               {/* Caller Context */} 
-              <motion.div
-                initial={{ x: 20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-                className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200"
-              >
+              <div className="">
+                <motion.div
+                  initial={{ x: 20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                  className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200"
+                >
                 <h2 className="text-xl font-semibold mb-4 flex items-center">
                   <Users className="w-5 h-5 mr-2 text-black" />
                   Caller Information
@@ -846,16 +873,8 @@ export default function AgentAPage() {
                     </div>
                   </div>
                 </div>
-
-                {/* Live Transcription */} 
-                <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
-                  <TranscriptionDisplay
-                    roomName={room}
-                    isActive={isConnected}
-                    onToggleRecording={(recording) => setIsRecording(recording)}
-                  />
-                </div>
-              </motion.div>
+                </motion.div>
+              </div>
             </div>
 
             <div className="mt-6 text-center">

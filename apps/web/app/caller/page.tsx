@@ -13,6 +13,7 @@ import '@livekit/components-styles';
 import { useEffect, useState } from 'react';
 import { Phone, MessageSquare, Users, PhoneOff, User } from 'lucide-react';
 import ChatInterface from '../../components/ChatInterface';
+import LiveKitChatInterface from '../../components/LiveKitChatInterface';
 
 export default function CallerPage() {
   const room = 'support_room';
@@ -480,6 +481,20 @@ export default function CallerPage() {
               </div>
             </div>
           </div>
+          
+          {/* Live Chat Interface Preview */}
+          <div className="mt-8">
+            <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200 max-w-md mx-auto">
+              <h2 className="text-xl font-semibold mb-4">Live Chat Interface Preview</h2>
+              <p className="text-gray-600 mb-4 text-sm">This is how the chat will appear during your support call:</p>
+              <div style={{ height: '400px' }}>
+                <LiveKitChatInterface 
+                  room={roomInstance}
+                  localUserType="caller"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -537,16 +552,30 @@ export default function CallerPage() {
             <p className="text-gray-600">Connected to our support team</p>
           </div>
 
-          <div className="max-w-4xl mx-auto">
-            <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
-              <h2 className="text-xl font-semibold mb-4 text-center">Support Call in Progress</h2>
-              <div className="mb-4 text-center">
-                <p className="text-sm text-gray-500">Room: <span className="font-mono text-black">{currentRoom}</span></p>
+          <div className="max-w-7xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Video Conference */}
+              <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
+                <h2 className="text-xl font-semibold mb-4 text-center">Support Call in Progress</h2>
+                <div className="mb-4 text-center">
+                  <p className="text-sm text-gray-500">Room: <span className="font-mono text-black">{currentRoom}</span></p>
+                </div>
+                <div data-lk-theme="default" style={{ height: '500px' }}>
+                  <MyVideoConference />
+                  <RoomAudioRenderer />
+                  <ControlBar />
+                </div>
               </div>
-              <div data-lk-theme="default" style={{ height: '500px' }}>
-                <MyVideoConference />
-                <RoomAudioRenderer />
-                <ControlBar />
+
+              {/* Live Chat Interface */}
+              <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
+                <h2 className="text-xl font-semibold mb-4 text-green-600">🔥 Live Chat</h2>
+                <div style={{ height: '500px' }}>
+                  <LiveKitChatInterface 
+                    room={roomInstance}
+                    localUserType="caller"
+                  />
+                </div>
               </div>
             </div>
 

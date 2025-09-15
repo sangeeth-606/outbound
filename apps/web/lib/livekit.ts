@@ -117,3 +117,42 @@ export class LiveKitManager {
 export function getLiveKitUrl(): string {
   return process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://your-livekit-server.com';
 }
+
+// Utility functions for text streaming
+export async function sendChatMessage(room: Room, message: string): Promise<void> {
+  if (!room || room.state !== 'connected') {
+    throw new Error('Room is not connected');
+  }
+  
+  await room.localParticipant.sendText(message, { topic: 'chat' });
+}
+
+export function registerChatHandler(
+  room: Room, 
+  onMessage: (message: string, senderIdentity: string) => void
+): void {
+  if (!room) {
+    throw new Error('Room is required');
+  }
+
+  room.registerTextStreamHandler('chat', async (reader, participantInfo) => {
+    try {
+      const text = await reader.readAll();
+      if (text.trim()) {
+        onMessage(text.trim(), participantInfo.identity);
+      }
+    } catch (error) {
+      console.error('Error reading chat message:', error);
+    }
+  });
+}
+
+export function unregisterChatHandler(room: Room): void {
+  if (room) {
+    try {
+      room.unregisterTextStreamHandler('chat');
+    } catch (error) {
+      console.error('Error unregistering chat handler:', error);
+    }
+  }
+}
