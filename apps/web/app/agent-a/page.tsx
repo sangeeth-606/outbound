@@ -15,7 +15,6 @@ import { Phone, MessageSquare, Users, PhoneOff, User, CheckCircle, AlertTriangle
 import { motion, AnimatePresence } from 'framer-motion';
 import ChatInterface from '../../components/ChatInterface';
 import TranscriptionDisplay from '../../components/TranscriptionDisplay';
-import TransferHistory from '../../components/TransferHistory';
 import LiveKitChatInterface from '../../components/LiveKitChatInterface';
 
 export default function AgentAPage() {
@@ -29,7 +28,6 @@ export default function AgentAPage() {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showChat, setShowChat] = useState(false);
   const [callerContext, setCallerContext] = useState<any>(null);
   const [transferStatus, setTransferStatus] = useState<'idle' | 'initiating' | 'in_progress' | 'completed'>('idle');
   const [transferSummary, setTransferSummary] = useState<string | null>(null);
@@ -216,9 +214,8 @@ export default function AgentAPage() {
           // The backend already connected us, so we should be getting a token
           // For now, we'll wait for the customer to connect
           alert('You are now taking calls! A customer may connect soon.');
-        } else {
-          alert('You are now available to take calls.');
         }
+        // No alert for 'You are now available to take calls.'
       } else {
         alert('Failed to start taking calls. Please try again.');
         setAgentStatus('offline');
@@ -523,7 +520,7 @@ export default function AgentAPage() {
         >
           <motion.div
             animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
             className="w-8 h-8 border-2 border-black border-t-transparent rounded-full mx-auto mb-4"
           ></motion.div>
           <h2 className="text-xl font-semibold mb-2">Connecting...</h2>
@@ -545,350 +542,116 @@ export default function AgentAPage() {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-white text-black">
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-4">
-              <User className="w-8 h-8 text-black mr-3" />
-              <h1 className="text-3xl font-bold">Agent A Dashboard</h1>
-            </div>
-            <p className="text-gray-600">First-line support specialist ready to take calls</p>
-          </div>
-
-          <div className="text-center">
-            <div className="bg-gray-100 rounded-lg shadow-md p-8 max-w-md mx-auto border border-gray-200">
-              <Phone className="w-16 h-16 text-black mx-auto mb-4" />
-              <h2 className="text-xl font-semibold mb-4">Ready to Take Calls</h2>
-              <p className="text-gray-600 mb-6">
-                Click the button below to start taking customer calls and providing support.
-              </p>
-              <div className="space-y-3">
+      <div className="min-h-screen bg-white text-black flex flex-col">
+        <header className="w-full py-10 px-4 text-center">
+          <h1 className="text-4xl font-bold mb-2 text-blue-900">Agent A Dashboard</h1>
+          <p className="text-lg text-blue-700">First-line support specialist ready to take calls</p>
+        </header>
+        <main className="flex-1 w-full flex flex-col md:flex-row gap-0 md:gap-8 px-2 md:px-8 lg:px-20 pb-8">
+          <section className="flex-1 flex flex-col justify-center md:pr-8 mb-8 md:mb-0">
+            <h2 className="text-2xl font-semibold mb-6 text-gray-900">Ready to Take Calls</h2>
+            <div className="space-y-3">
+              {agentStatus === 'offline' ? (
+                <button
+                  onClick={startTakingCalls}
+                  className="w-full bg-black hover:bg-gray-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                >
+                  Start Taking Calls
+                </button>
+              ) : agentStatus === 'available' ? (
                 <div className="space-y-3">
-                  {agentStatus === 'offline' ? (
-                    <button
-                      onClick={startTakingCalls}
-                      className="w-full bg-black hover:bg-gray-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                    >
-                      Start Taking Calls
-                    </button>
-                  ) : agentStatus === 'available' ? (
-                    <div className="space-y-3">
-                      <div className="bg-green-100 border border-green-400 rounded-lg p-4 text-center">
-                        <div className="animate-pulse w-4 h-4 bg-green-500 rounded-full mx-auto mb-2"></div>
-                        <p className="text-green-700 font-medium">Available for calls</p>
-                        <p className="text-gray-600 text-sm">Waiting for customers...</p>
-                      </div>
-                      <button
-                        onClick={pickNextCustomer}
-                        disabled={isPickingCustomer}
-                        className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                      >
-                        {isPickingCustomer ? 'Connecting...' : 'Pick Next Customer'}
-                      </button>
-                      <button
-                        onClick={stopTakingCalls}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                      >
-                        Stop Taking Calls
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="bg-orange-100 border border-orange-400 rounded-lg p-4 text-center">
-                      <div className="animate-pulse w-4 h-4 bg-orange-500 rounded-full mx-auto mb-2"></div>
-                      <p className="text-orange-700 font-medium">On a call</p>
-                      {nextCustomer && (
-                        <p className="text-gray-600 text-sm">Customer: {nextCustomer.email}</p>
-                      )}
-                    </div>
+                  <div className="bg-green-100 border border-green-400 rounded-lg p-4 text-center">
+                    <div className="animate-pulse w-4 h-4 bg-green-500 rounded-full mx-auto mb-2"></div>
+                    <p className="text-green-700 font-medium">Available for calls</p>
+                    <p className="text-gray-600 text-sm">Waiting for customers...</p>
+                  </div>
+                  <button
+                    onClick={pickNextCustomer}
+                    disabled={isPickingCustomer}
+                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                  >
+                    {isPickingCustomer ? 'Connecting...' : 'Pick Next Customer'}
+                  </button>
+                  <button
+                    onClick={stopTakingCalls}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                  >
+                    Stop Taking Calls
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-orange-100 border border-orange-400 rounded-lg p-4 text-center">
+                  <div className="animate-pulse w-4 h-4 bg-orange-500 rounded-full mx-auto mb-2"></div>
+                  <p className="text-orange-700 font-medium">On a call</p>
+                  {nextCustomer && (
+                    <p className="text-gray-600 text-sm">Customer: {nextCustomer.email}</p>
                   )}
                 </div>
-                <button
-                  onClick={() => setShowChat(true)}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-2"
-                >
-                  <MessageSquare className="w-5 h-5" />
-                  <span>Start AI Chat Demo</span>
-                </button>
-              </div>
+              )}
             </div>
-
-            {/* Live Transcription */} 
-            <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
-              <TranscriptionDisplay
-                roomName={room}
-                isActive={isConnected}
-                onToggleRecording={(recording) => setIsRecording(recording)}
-              />
-            </div>
-          </div>
-
-          {/* Transfer History */} 
-          <div className="mt-8">
-            <TransferHistory agentId={name} />
-          </div>
-          
-          {/* Live Chat Interface Preview */}
-          <div className="mt-8">
-            <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200 max-w-md mx-auto">
-              <h2 className="text-xl font-semibold mb-4">Live Chat Interface Preview</h2>
-              <p className="text-gray-600 mb-4 text-sm">This is how the chat will appear during customer calls:</p>
-              <div style={{ height: '400px' }}>
-                <LiveKitChatInterface 
-                  room={roomInstance}
-                  localUserType="agent"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+          </section>
+        </main>
       </div>
     );
   }
 
-  if (showChat) {
-    return (
-      <div className="min-h-screen bg-white text-black">
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="h-[600px]">
-                <ChatInterface 
-                  callerType="investor"
-                  email="demo@example.com"
-                />
-              </div>
-              <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
-                <h2 className="text-xl font-semibold mb-4">AI Chat Demo</h2>
-                <div className="space-y-4">
-                  <div className="bg-blue-100 border border-blue-400 rounded-lg p-4">
-                    <h3 className="font-semibold text-blue-700 mb-2">Features Available</h3>
-                    <ul className="text-gray-600 text-sm space-y-1">
-                      <li>• Voice-to-text transcription</li>
-                      <li>• Context-aware AI responses</li>
-                      <li>• Text-to-speech playback</li>
-                      <li>• Conversation history</li>
-                      <li>• Customer context integration</li>
-                    </ul>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowChat(false)}
-                  className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                >
-                  Close Chat Demo
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // Connected state: unified, responsive, modern layout
   return (
     <RoomContext.Provider value={roomInstance}>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
-        className="min-h-screen bg-white text-black"
-      >
-        <div className="container mx-auto px-4 py-8">
-          <motion.div
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-center mb-8"
-          >
-            <div className="flex items-center justify-center mb-4">
-              <motion.div
-                animate={{
-                  scale: isConnected ? [1, 1.1, 1] : 1,
-                  color: isConnected ? '#000' : '#9CA3AF'
-                }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                <User className="w-8 h-8 mr-3" />
-              </motion.div>
-              <h1 className="text-3xl font-bold">Agent A Dashboard</h1>
-            </div>
-            <p className="text-gray-600">First-line support specialist - taking customer calls</p>
-          </motion.div>
-
-          <div className="max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Video Conference */} 
-              <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
-                <h2 className="text-xl font-semibold mb-4">Customer Call</h2>
-                <div data-lk-theme="default" style={{ height: '400px' }}>
-                  <MyVideoConference />
-                  <RoomAudioRenderer />
-                  <ControlBar />
+      <div className="min-h-screen h-screen w-full bg-gradient-to-br from-blue-50 to-white text-black flex flex-col">
+        <header className="w-full py-6 px-4 text-center border-b border-gray-100">
+          <h1 className="text-3xl md:text-4xl font-bold mb-1 text-blue-900">Agent A Call in Progress</h1>
+          <p className="text-blue-700 text-base">Room: <span className="font-mono text-black">{room}</span></p>
+        </header>
+        <main className="flex-1 w-full flex flex-row h-full overflow-hidden">
+          <section className="flex flex-1 flex-row h-full w-full">
+            {/* Video Conference - left side */}
+            <div className="flex-1 flex flex-col h-full min-w-0">
+              <div className="flex flex-row items-center justify-between px-6 py-4 border-b border-gray-100 bg-white">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-semibold text-gray-900">{nextCustomer?.email || 'No customer assigned'}</span>
+                  <span className="text-xs text-gray-500">{roomInstance.localParticipant.identity}</span>
                 </div>
               </div>
-
-              {/* Live Chat Interface */}
-              <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
-                <h2 className="text-xl font-semibold mb-4 text-green-600">🔥 Live Chat</h2>
-                <div style={{ height: '400px' }}>
+              {/* Video and controls stacked, controls pinned bottom, responsive */}
+              <div className="flex-1 flex flex-col bg-white min-h-0">
+                {isConnected && (
+                  <>
+                    <div className="flex-1 min-h-0 flex flex-col justify-center">
+                      <MyVideoConference />
+                      <RoomAudioRenderer />
+                    </div>
+                    <div className="w-full border-t border-gray-200 bg-white px-2 py-2 flex-shrink-0 flex justify-center shadow-sm z-10" data-lk-theme="default">
+                      <div className="max-w-[520px] w-full overflow-x-auto flex flex-nowrap">
+                        <ControlBar />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            {/* Divider */}
+            <div className="w-[1.5px] bg-gradient-to-b from-gray-200/80 via-gray-300/60 to-gray-100/0 mx-0" style={{ minHeight: '100%' }} />
+            {/* Chat - right side */}
+            <aside className="w-full max-w-[380px] flex flex-col h-full bg-white">
+              <div className="flex flex-col h-full px-0 py-0">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h2 className="text-xl font-semibold text-green-700 flex items-center gap-2">
+                    <span role="img" aria-label="chat">🔥</span> Live Chat
+                  </h2>
+                </div>
+                <div className="flex-1 min-h-0">
                   <LiveKitChatInterface 
                     room={roomInstance}
                     localUserType="agent"
+                    className="h-full"
                   />
                 </div>
               </div>
-
-              {/* Caller Context */} 
-              <div className="">
-                <motion.div
-                  initial={{ x: 20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ duration: 0.5, delay: 0.3 }}
-                  className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200"
-                >
-                <h2 className="text-xl font-semibold mb-4 flex items-center">
-                  <Users className="w-5 h-5 mr-2 text-black" />
-                  Caller Information
-                </h2>
-
-                <div className="space-y-4">
-                  <motion.div
-                    initial={{ scale: 0.95, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.3, delay: 0.4 }}
-                    className="bg-blue-100 border border-blue-400 rounded-lg p-4"
-                  >
-                    <h3 className="font-semibold text-black mb-2 flex items-center">
-                      <Phone className="w-4 h-4 mr-2" />
-                      Call Status
-                    </h3>
-                    <div className="text-gray-600 text-sm space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span>Room:</span>
-                        <span className="font-medium">support_room</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Connected:</span>
-                        <div className="flex items-center space-x-2">
-                          <motion.div
-                            animate={{
-                              scale: isConnected ? [1, 1.2, 1] : 1,
-                              backgroundColor: isConnected ? '#10B981' : '#EF4444'
-                            }}
-                            transition={{ duration: 2, repeat: isConnected ? Infinity : 0 }}
-                            className="w-2 h-2 rounded-full"
-                          ></motion.div>
-                          <span className={`font-medium ${isConnected ? 'text-green-600' : 'text-red-600'}`}>
-                            {isConnected ? 'Yes' : 'No'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Duration:</span>
-                        <span className="font-medium text-green-600 font-mono">
-                          {Math.floor(callDuration / 60)}:{(callDuration % 60).toString().padStart(2, '0')}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Transfer Status:</span>
-                        <div className="flex items-center space-x-2">
-                          {transferStatus === 'idle' && <span className="text-gray-400">None</span>}
-                          {transferStatus === 'initiating' && (
-                            <motion.div
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                              className="flex items-center space-x-1"
-                            >
-                              <Clock className="w-4 h-4 text-yellow-600" />
-                              <span className="text-yellow-600 font-medium">Initiating</span>
-                            </motion.div>
-                          )}
-                          {transferStatus === 'in_progress' && (
-                            <motion.div
-                              animate={{ scale: [1, 1.1, 1] }}
-                              transition={{ duration: 1, repeat: Infinity }}
-                              className="flex items-center space-x-1"
-                            >
-                              <Zap className="w-4 h-4 text-orange-600" />
-                              <span className="text-orange-600 font-medium">In Progress</span>
-                            </motion.div>
-                          )}
-                          {transferStatus === 'completed' && (
-                            <div className="flex items-center space-x-1">
-                              <CheckCircle className="w-4 h-4 text-green-600" />
-                              <span className="text-green-600 font-medium">Completed</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  <AnimatePresence>
-                    {transferSummary && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="bg-gray-200 border border-gray-300 rounded-lg p-3 overflow-hidden"
-                      >
-                        <p className="text-xs text-gray-500 mb-1">Transfer Summary:</p>
-                        <p className="text-xs text-black leading-relaxed">{transferSummary}</p>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  
-                  <div className="bg-green-100 border border-green-400 rounded-lg p-4">
-                    <h3 className="font-semibold text-black mb-2">Support Actions</h3>
-                    <div className="space-y-2">
-                      <button
-                        onClick={toggleLiveTranscription}
-                        className={`w-full px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${ 
-                          isTranscriptionActive
-                            ? 'bg-red-600 hover:bg-red-700 text-white'
-                            : 'bg-blue-600 hover:bg-blue-700 text-white'
-                        }`}
-                      >
-                        {isTranscriptionActive ? 'Stop Live Transcript' : 'Start Live Transcript'}
-                      </button>
-                      <button
-                        onClick={initiateTransfer}
-                        className="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-                      >
-                        Initiate Warm Transfer (Agent B)
-                      </button>
-                      <button
-                        onClick={initiateTwilioTransfer}
-                        className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-                      >
-                        Initiate Twilio Transfer (Phone)
-                      </button>
-                      <button
-                        onClick={() => setShowChat(true)}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-                      >
-                        Use AI Assistant
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                </motion.div>
-              </div>
-            </div>
-
-            <div className="mt-6 text-center">
-              <button
-                onClick={disconnect}
-                className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2 mx-auto"
-              >
-                <PhoneOff className="w-5 h-5" />
-                <span>End Call</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </motion.div>
+            </aside>
+          </section>
+        </main>
+      </div>
     </RoomContext.Provider>
   );
 }

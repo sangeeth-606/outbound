@@ -419,83 +419,59 @@ export default function CallerPage() {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-white text-black">
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-4">
-              <Phone className="w-8 h-8 text-black mr-3" />
-              <h1 className="text-3xl font-bold">Customer Support</h1>
-            </div>
-            <p className="text-gray-600">Connect with our support team for assistance</p>
-          </div>
-
-          <div className="text-center">
-            <div className="bg-gray-100 rounded-lg shadow-md p-8 max-w-md mx-auto border border-gray-200">
-              <User className="w-16 h-16 text-black mx-auto mb-4" />
-              <h2 className="text-xl font-semibold mb-4">Start Your Call</h2>
-              
-              <div className="space-y-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
-                    Your Email Address
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your.email@example.com"
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-black placeholder-gray-400 focus:outline-none focus:border-black"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-2">
-                    Caller Type
-                  </label>
-                  <select
-                    value={callerType}
-                    onChange={(e) => setCallerType(e.target.value)}
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-black focus:outline-none focus:border-black"
-                  >
-                    <option value="investor">Investor</option>
-                    <option value="prospect">Prospect</option>
-                    <option value="general">General Inquiry</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <button
-                  onClick={connectToCall}
-                  className="w-full bg-black hover:bg-gray-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                >
-                  Start Call
-                </button>
-                <button
-                  onClick={() => setShowChat(true)}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center space-x-2"
-                >
-                  <MessageSquare className="w-5 h-5" />
-                  <span>Start AI Chat Demo</span>
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          {/* Live Chat Interface Preview */}
-          <div className="mt-8">
-            <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200 max-w-md mx-auto">
-              <h2 className="text-xl font-semibold mb-4">Live Chat Interface Preview</h2>
-              <p className="text-gray-600 mb-4 text-sm">This is how the chat will appear during your support call:</p>
-              <div style={{ height: '400px' }}>
-                <LiveKitChatInterface 
-                  room={roomInstance}
-                  localUserType="caller"
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white text-black flex flex-col">
+        {/* Header */}
+        <header className="w-full py-10 px-4 text-center">
+          <h1 className="text-4xl font-bold mb-2 text-blue-900">Customer Support</h1>
+          <p className="text-lg text-blue-700">Connect with our support team for assistance</p>
+        </header>
+        {/* Main Content */}
+        <main className="flex-1 w-full flex flex-col md:flex-row gap-0 md:gap-8 px-2 md:px-8 lg:px-20 pb-8">
+          {/* Call Form */}
+          <section className="flex-1 flex flex-col justify-center md:pr-8 mb-8 md:mb-0">
+            <h2 className="text-2xl font-semibold mb-6 text-gray-900">Start Your Call</h2>
+            <form className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Your Email Address</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  placeholder="you@example.com"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Caller Type</label>
+                <select
+                  value={callerType}
+                  onChange={e => setCallerType(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="investor">Investor</option>
+                  <option value="prospect">Prospect</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={connectToCall}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors mt-2"
+              >
+                Start Call
+              </button>
+            </form>
+          </section>
+          {/* Chat Preview */}
+          <section className="flex-1 flex flex-col justify-center md:pl-8">
+            <h2 className="text-2xl font-semibold mb-6 text-green-700">Live Chat Interface Preview</h2>
+            <div className="w-full max-w-xl mx-auto">
+              <LiveKitChatInterface 
+                room={roomInstance}
+                localUserType="caller"
+              />
             </div>
-          </div>
-        </div>
+          </section>
+        </main>
       </div>
     );
   }
@@ -542,67 +518,57 @@ export default function CallerPage() {
 
   return (
     <RoomContext.Provider value={roomInstance}>
-      <div className="min-h-screen bg-white text-black">
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-4">
-              <Phone className="w-8 h-8 text-black mr-3" />
-              <h1 className="text-3xl font-bold">Customer Support Call</h1>
-            </div>
-            <p className="text-gray-600">Connected to our support team</p>
-          </div>
-
-          <div className="max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Video Conference */}
-              <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
-                <h2 className="text-xl font-semibold mb-4 text-center">Support Call in Progress</h2>
-                <div className="mb-4 text-center">
-                  <p className="text-sm text-gray-500">Room: <span className="font-mono text-black">{currentRoom}</span></p>
+      <div className="min-h-screen h-screen w-full bg-gradient-to-br from-blue-50 to-white text-black flex flex-col">
+        <header className="w-full py-6 px-4 text-center border-b border-gray-100">
+          <h1 className="text-3xl md:text-4xl font-bold mb-1 text-blue-900">Support Call in Progress</h1>
+          <p className="text-blue-700 text-base">Room: <span className="font-mono text-black">{currentRoom}</span></p>
+        </header>
+        <main className="flex-1 w-full flex flex-row h-full overflow-hidden">
+          {/* Unified container for video and chat */}
+          <section className="flex flex-1 flex-row h-full w-full">
+            {/* Video Conference - left side */}
+            <div className="flex-1 flex flex-col h-full min-w-0">
+              <div className="flex flex-row items-center justify-between px-6 py-4 border-b border-gray-100 bg-white">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-semibold text-gray-900">{email}</span>
+                  <span className="text-xs text-gray-500">{roomInstance.localParticipant.identity}</span>
                 </div>
-                <div data-lk-theme="default" style={{ height: '500px' }}>
+                {/* Removed custom Leave button, rely on ControlBar */}
+              </div>
+              {/* Video and controls stacked, controls pinned bottom, responsive */}
+              <div className="flex-1 flex flex-col bg-white min-h-0">
+                <div className="flex-1 min-h-0 flex flex-col justify-center">
                   <MyVideoConference />
                   <RoomAudioRenderer />
-                  <ControlBar />
+                </div>
+                <div className="w-full border-t border-gray-200 bg-white px-2 py-2 flex-shrink-0 flex justify-center shadow-sm z-10" data-lk-theme="default">
+                  <div className="max-w-[520px] w-full overflow-x-auto flex flex-nowrap">
+                    <ControlBar />
+                  </div>
                 </div>
               </div>
-
-              {/* Live Chat Interface */}
-              <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
-                <h2 className="text-xl font-semibold mb-4 text-green-600">🔥 Live Chat</h2>
-                <div style={{ height: '500px' }}>
+            </div>
+            {/* Divider */}
+            <div className="w-[1.5px] bg-gradient-to-b from-gray-200/80 via-gray-300/60 to-gray-100/0 mx-0" style={{ minHeight: '100%' }} />
+            {/* Chat - right side */}
+            <aside className="w-full max-w-[380px] flex flex-col h-full bg-white">
+              <div className="flex flex-col h-full px-0 py-0">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h2 className="text-xl font-semibold text-green-700 flex items-center gap-2">
+                    <span role="img" aria-label="chat">🔥</span> Live Chat
+                  </h2>
+                </div>
+                <div className="flex-1 min-h-0">
                   <LiveKitChatInterface 
                     room={roomInstance}
                     localUserType="caller"
+                    className="h-full"
                   />
                 </div>
               </div>
-            </div>
-
-            {transferMessage && (
-              <div className="mt-4 bg-blue-100 border border-blue-400 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-700 mb-2">Transfer Status</h3>
-                <p className="text-gray-600 text-sm">{transferMessage}</p>
-                {transferStatus === 'in_progress' && (
-                  <div className="mt-2 flex items-center space-x-2">
-                    <div className="animate-spin w-4 h-4 border-2 border-black border-t-transparent rounded-full"></div>
-                    <span className="text-sm text-gray-500">Transferring...</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="mt-6 text-center">
-              <button
-                onClick={disconnect}
-                className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center space-x-2 mx-auto"
-              >
-                <PhoneOff className="w-5 h-5" />
-                <span>End Call</span>
-              </button>
-            </div>
-          </div>
-        </div>
+            </aside>
+          </section>
+        </main>
       </div>
     </RoomContext.Provider>
   );
