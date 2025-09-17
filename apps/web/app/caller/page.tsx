@@ -254,9 +254,10 @@ export default function CallerPage() {
             if (data.type === 'transfer_initiated') {
               setTransferStatus('in_progress');
               setTransferMessage('Your call is being transferred to a specialist. Please hold...');
-            } else if (data.type === 'switch_to_transfer_room') {
-              // Handle room switch for customer
-              switchToTransferRoom(data.transfer_room_name, data.caller_token, data.summary);
+            } else if (data.type === 'transfer_ready') {
+              // Simple transfer - agent B is joining this room, no room switching needed
+              setTransferStatus('completed');
+              setTransferMessage('Transfer completed. A specialist has joined your call.');
             } else if (data.type === 'transfer_completed') {
               setTransferStatus('completed');
               setTransferMessage('Transfer completed. You are now connected to a specialist.');

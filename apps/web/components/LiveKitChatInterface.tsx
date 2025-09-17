@@ -11,10 +11,13 @@ interface ChatMessage {
   senderIdentity: string;
   timestamp: Date;
   isLocal: boolean;
+  type?: 'message' | 'summary' | 'system';
 }
 
 export interface LiveKitChatInterfaceRef {
   addAutoMessage: (message: string) => void;
+  addSummaryMessage: (summary: string, title?: string) => void;
+  getChatHistory: () => ChatMessage[];
 }
 
 interface LiveKitChatInterfaceProps {
@@ -44,7 +47,8 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
         sender: 'You',
         senderIdentity: room.localParticipant.identity,
         timestamp: new Date(),
-        isLocal: true
+        isLocal: true,
+        type: 'message'
       };
       
       setMessages(prev => {
@@ -63,8 +67,25 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
         console.log('Adding auto-transcription message to chat display:', autoMessage);
         return [...prev, autoMessage];
       });
+    },
+    addSummaryMessage: (summary: string, title: string = 'Call Summary') => {
+      const summaryMessage: ChatMessage = {
+        id: `summary-${Date.now()}-${Math.random()}`,
+        content: summary,
+        sender: title,
+        senderIdentity: 'system',
+        timestamp: new Date(),
+        isLocal: false,
+        type: 'summary'
+      };
+      
+      console.log('Adding summary message to chat display:', summaryMessage);
+      setMessages(prev => [summaryMessage, ...prev]); // Add at the beginning
+    },
+    getChatHistory: () => {
+      return messages.filter(msg => msg.type === 'message'); // Only return regular messages
     }
-  }), [room]);
+  }), [room, messages]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -114,7 +135,8 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
             sender: isLocalMessage ? 'You' : participantInfo.identity || 'Unknown',
             senderIdentity: participantInfo.identity || 'Unknown',
             timestamp: new Date(),
-            isLocal: isLocalMessage
+            isLocal: isLocalMessage,
+            type: 'message'
           };
 
           setMessages(prev => {
@@ -183,7 +205,8 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
         sender: 'You',
         senderIdentity: room.localParticipant.identity,
         timestamp: new Date(),
-        isLocal: true
+        isLocal: true,
+        type: 'message'
       };
       
       setMessages(prev => [...prev, localMessage]);
@@ -261,32 +284,56 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`flex ${message.isLocal ? 'justify-end' : 'justify-start'}`}
+            className={`flex ${message.type === 'summary' ? 'justify-center' : message.isLocal ? 'justify-end' : 'justify-start'}`}
           >
-            <div
-              className={`max-w-[80%] px-3 py-2 rounded-lg text-sm font-medium ${
-                message.isLocal
-                  ? 'bg-red-400 text-white'
-                  : 'bg-gray-100 text-gray-800'
-              }`}
-            >
-              <div className="flex items-center space-x-2 mb-1">
-                <span className={`text-xs font-semibold tracking-wide ${
-                  message.isLocal ? 'text-red-100' : 'text-gray-600'
-                }`}>
-                  {getSenderDisplayName(message)}
-                </span>
-                <span className={`text-xs font-medium ${
-                  message.isLocal ? 'text-red-100' : 'text-gray-500'
-                }`}>
-                  {message.timestamp.toLocaleTimeString([], { 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
-                  })}
-                </span>
+            {message.type === 'summary' ? (
+              // Summary message styling
+              <div className="w-full max-w-full mb-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-sm">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm font-bold text-blue-700 uppercase tracking-wide">
+                      {message.sender}
+                    </span>
+                    <span className="text-xs text-blue-500 font-medium">
+                      {message.timestamp.toLocaleTimeString([], { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </span>
+                  </div>
+                  <div className="text-sm text-blue-800 leading-relaxed whitespace-pre-wrap">
+                    {message.content}
+                  </div>
+                </div>
               </div>
-              <p className="break-words">{message.content}</p>
-            </div>
+            ) : (
+              // Regular message styling
+              <div
+                className={`max-w-[80%] px-3 py-2 rounded-lg text-sm font-medium ${
+                  message.isLocal
+                    ? 'bg-red-400 text-white'
+                    : 'bg-gray-100 text-gray-800'
+                }`}
+              >
+                <div className="flex items-center space-x-2 mb-1">
+                  <span className={`text-xs font-semibold tracking-wide ${
+                    message.isLocal ? 'text-red-100' : 'text-gray-600'
+                  }`}>
+                    {getSenderDisplayName(message)}
+                  </span>
+                  <span className={`text-xs font-medium ${
+                    message.isLocal ? 'text-red-100' : 'text-gray-500'
+                  }`}>
+                    {message.timestamp.toLocaleTimeString([], { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </span>
+                </div>
+                <p className="break-words">{message.content}</p>
+              </div>
+            )}
           </div>
         ))}
         <div ref={messagesEndRef} />

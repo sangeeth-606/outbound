@@ -44,19 +44,15 @@ export default function AgentBPage() {
     };
   }, [roomInstance]);
 
-  // Poll for transfer notifications without needing to be connected to a room
+  // Poll for transfer notifications
   useEffect(() => {
-    if (isWaitingForTransfer) {
+    if (isConnected && isWaitingForTransfer) {
       const pollInterval = setInterval(async () => {
         try {
-          console.log(`Agent B polling for transfers at ${new Date().toISOString()}`);
           const response = await fetch(`/api/agent/transfer-status/${name}`);
-          console.log(`Transfer status response:`, response.status);
           const data = await response.json();
-          console.log(`Transfer status data:`, data);
 
           if (data.success && data.has_pending_transfer) {
-            console.log('🎉 Transfer found! Details:', data.transfer_details);
             const transfer = data.transfer_details;
             setTransferSummary(transfer.summary);
             setTransferRoomName(transfer.transfer_room_name);
@@ -66,26 +62,19 @@ export default function AgentBPage() {
             setIsWaitingForTransfer(false);
             setTransferStatus('transfer_available');
 
-            // Add summary to chat interface when it becomes available
-            setTimeout(() => {
-              if (chatInterfaceRef.current && transfer.summary) {
-                chatInterfaceRef.current.addSummaryMessage(
-                  transfer.summary, 
-                  `📋 Transfer Summary from Agent A`
-                );
-              }
-            }, 1000);
+            // Add summary to chat interface
+            if (chatInterfaceRef.current && transfer.summary) {
+              chatInterfaceRef.current.addSummaryMessage(
+                transfer.summary, 
+                `📋 Transfer Summary from Agent A`
+              );
+            }
 
             const transcriptionInfo = transfer.transcription_context?.total_segments
               ? `\n\n📝 Transcription: ${transfer.transcription_context.total_segments} segments available`
               : '\n\n📝 No transcription data available';
 
-            alert(`🎉 Transfer Available!\n\n📋 Summary: ${transfer.summary}\n\n🏠 Room: ${transfer.transfer_room_name}\n\n👥 Agent A and caller are already in this room. Click "Join Transfer Room" to join them.${transcriptionInfo}`);
-            
-            // Clear the polling interval since we found a transfer
-            clearInterval(pollInterval);
-          } else {
-            console.log('No pending transfer found or not ready yet:', data.message);
+            alert(`🎉 Transfer Available!\n\n📋 Summary: ${transfer.summary}\n\n🏠 Transfer Room: ${transfer.transfer_room_name}${transcriptionInfo}`);
           }
         } catch (error) {
           console.error('Failed to check transfer status:', error);
@@ -94,61 +83,7 @@ export default function AgentBPage() {
 
       return () => clearInterval(pollInterval);
     }
-  }, [isWaitingForTransfer, name]);
-
-  const connectToTransferRoom = async (roomName: string, token: string) => {
-    try {
-      setIsConnecting(true);
-      setError(null);
-
-      await roomInstance.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://your-livekit-server.com', token);
-      setIsConnected(true);
-      setIsConnecting(false);
-      
-      console.log(`Agent B connected to transfer room: ${roomName}`);
-
-      // Add transfer summary to chat interface when Agent B joins
-      if (chatInterfaceRef.current && transferSummary) {
-        setTimeout(() => {
-          if (chatInterfaceRef.current && transferSummary) {
-            chatInterfaceRef.current.addSummaryMessage(
-              transferSummary, 
-              `📋 Transfer Summary from Agent A`
-            );
-            console.log('Added transfer summary to chat interface');
-          }
-        }, 1000); // Small delay to ensure chat interface is ready
-      }
-
-      // Set up data channel listener for transfer events
-      roomInstance.on(RoomEvent.DataReceived, (payload, participant) => {
-        try {
-          const data = JSON.parse(new TextDecoder().decode(payload));
-          if (data.type === 'transfer_initiated' && data.target_agent === 'agent_b') {
-            setTransferSummary(data.summary);
-            setTransferRoomName(data.transfer_room);
-            setTransferStatus('transfer_available');
-            
-            // Add summary to chat interface
-            if (chatInterfaceRef.current && data.summary) {
-              chatInterfaceRef.current.addSummaryMessage(
-                data.summary, 
-                `📋 Call Transfer Summary from Agent A`
-              );
-            }
-          } else if (data.type === 'transfer_completed') {
-            setTransferStatus('completed');
-          }
-        } catch (e) {
-          console.error('Failed to parse data message:', e);
-        }
-      });
-    } catch (e) {
-      console.error('Transfer room connection error:', e);
-      setError(e instanceof Error ? e.message : 'Failed to connect to transfer room');
-      setIsConnecting(false);
-    }
-  };
+  }, [isConnected, isWaitingForTransfer, name]);
 
   const connectToRoom = async () => {
     try {
@@ -233,7 +168,7 @@ export default function AgentBPage() {
     );
   }
 
-  if (!isConnected && isWaitingForTransfer) {
+  if (!isConnected) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-16">
@@ -242,57 +177,24 @@ export default function AgentBPage() {
               Agent B Dashboard
             </h1>
             <p className="text-gray-600">
-              Specialist support agent - waiting for transfers
+              Senior support specialist - Ready to receive warm transfers
             </p>
           </div>
 
-          <div className="max-w-4xl mx-auto flex justify-center">
-            <div className="max-w-md w-full">
-              <div className="bg-blue-100 border border-blue-400 rounded-lg p-6 text-center">
-                <div className="animate-pulse w-4 h-4 bg-blue-500 rounded-full mx-auto mb-2"></div>
-                <p className="text-blue-700 font-medium">Waiting for transfers...</p>
-                <p className="text-gray-600 text-sm">Agent A can transfer calls to you</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isConnected && transferStatus === 'transfer_available' && transferRoomName && transferToken) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="container mx-auto px-4 py-16">
-          <div className="text-center mb-12">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">
-              Transfer Available!
-            </h1>
-            <p className="text-gray-600">
-              Agent A has initiated a warm transfer
-            </p>
-          </div>
-
-          <div className="max-w-4xl mx-auto flex justify-center">
-            <div className="max-w-lg w-full space-y-6">
-              {transferSummary && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-blue-900 mb-2">📋 Call Summary</h3>
-                  <p className="text-blue-800 text-sm">{transferSummary}</p>
-                </div>
-              )}
+          <div className="max-w-md mx-auto">
+            <div className="space-y-4">
+              <button
+                onClick={connectToRoom}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+              >
+                Connect to Transfer System
+              </button>
               
-              <div className="bg-white rounded-lg shadow-md p-6 border">
-                <h3 className="text-lg font-semibold mb-4">Join Transfer Room</h3>
-                <p className="text-gray-600 mb-4">
-                  Room: <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">{transferRoomName}</span>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                <h3 className="font-semibold text-blue-700 mb-2">🔄 Transfer Ready</h3>
+                <p className="text-blue-600 text-sm">
+                  When Agent A initiates a transfer, you'll see the conversation summary and can join the call seamlessly.
                 </p>
-                <button
-                  onClick={() => connectToTransferRoom(transferRoomName, transferToken)}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                >
-                  Join Transfer Room
-                </button>
               </div>
             </div>
           </div>

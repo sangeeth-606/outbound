@@ -26,9 +26,9 @@ class TransferInitiateRequest(BaseModel):
 class TransferInitiateResponse(BaseModel):
     transfer_room_name: str
     summary: str
-    agent_a_token: str
+    agent_a_token: Optional[str] = None  # Optional - not needed in simplified flow
     agent_b_token: str
-    caller_token: str
+    caller_token: Optional[str] = None   # Optional - not needed in simplified flow
     twilio_call_sid: Optional[str] = None
     target_agent: Optional[Dict[str, Any]] = None
 

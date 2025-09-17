@@ -21,7 +21,7 @@ import { DeepgramContextProvider } from '../context/DeepgramContextProvider';
 import { MicrophoneContextProvider } from '../context/MicrophoneContextProvider';
 
 export default function AgentAPage() {
-  const room = 'support_room';
+  const [currentRoom, setCurrentRoom] = useState('support_room'); // Dynamic room name
   const name = 'agent_a';
   const [roomInstance] = useState(() => new Room({
     adaptiveStream: true,
@@ -76,6 +76,7 @@ export default function AgentAPage() {
               // Auto-connect to the assigned room
               if (message.room_name && message.agent_token) {
                 setToken(message.agent_token);
+                setCurrentRoom(message.room_name); // Update current room
                 setAgentStatus('busy');
                 setNextCustomer({ email: message.customer_email });
                 
@@ -153,7 +154,7 @@ export default function AgentAPage() {
       setIsConnecting(true);
       setError(null);
       
-      const resp = await fetch(`/api/token?room=${room}&username=${name}`);
+      const resp = await fetch(`/api/token?room=${currentRoom}&username=${name}`);
       const data = await resp.json();
       
       if (data.token) {
@@ -161,6 +162,12 @@ export default function AgentAPage() {
         await roomInstance.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://your-livekit-server.com', data.token);
         setIsConnected(true);
         setIsConnecting(false);
+        
+        // Update current room to the actual room we connected to
+        if (roomInstance.name) {
+          setCurrentRoom(roomInstance.name);
+          console.log('Connected to room:', roomInstance.name);
+        }
 
         // Set up data channel listener for transfer events
         roomInstance.on(RoomEvent.DataReceived, (payload, participant) => {
@@ -299,117 +306,106 @@ export default function AgentAPage() {
     try {
       setTransferStatus('initiating');
 
-      // Generate AI summary using Groq LLM
-      const response = await fetch('/api/generate-summary', {
+      // Collect chat history from current session
+      let chatSummary = "No chat history available";
+      let conversationContext = "Customer called about login issues. I verified their account is active and helped reset their password. They can now log in but can't see their dashboard. They need immediate access to their financial data for a meeting this afternoon. Customer seems frustrated but cooperative.";
+      
+      if (chatInterfaceRef.current) {
+        const chatHistory = chatInterfaceRef.current.getChatHistory();
+        
+        if (chatHistory.length > 0) {
+          console.log('Collected chat history for transfer:', chatHistory);
+          
+          // Convert chat history to conversation text
+          const chatConversationText = chatHistory
+            .map(msg => `${msg.sender}: ${msg.content}`)
+            .join('\n');
+          
+          // Send chat history to backend for AI summarization
+          try {
+            const chatResponse = await fetch('/api/chat/history', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                room_name: currentRoom,
+                messages: chatHistory
+              }),
+            });
+
+            const chatData = await chatResponse.json();
+            if (chatData.success && chatData.summary) {
+              chatSummary = chatData.summary;
+              conversationContext = chatSummary; // Use the LLM-generated summary
+              console.log('Generated chat summary from LLM:', chatSummary);
+            } else {
+              // Fallback to conversation text if LLM summary failed
+              conversationContext = chatConversationText;
+              console.log('Using raw chat conversation as fallback:', conversationContext);
+            }
+          } catch (error) {
+            console.error('Failed to generate chat summary:', error);
+            // Fallback to conversation text
+            conversationContext = chatConversationText;
+          }
+        }
+      }
+
+      // Use the chat-based conversation context directly (no second API call needed)
+      const finalSummary = conversationContext;
+
+      // Now initiate the actual transfer
+      console.log('Initiating transfer API call...');
+      const transferResponse = await fetch('/api/transfer', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          conversation_context: "Customer called about login issues. I verified their account is active and helped reset their password. They can now log in but can't see their dashboard. They need immediate access to their financial data for a meeting this afternoon. Customer seems frustrated but cooperative.",
+          original_room_name: currentRoom,
+          agent_a_id: name,
+          transfer_target: "agent_b",
           caller_type: "investor",
-          caller_info: {
-            name: "John Doe",
-            email: "john.doe@example.com",
-            portfolio: "$50,000 across 3 companies"
-          }
+          email: nextCustomer?.email || "unknown@example.com",
+          summary: finalSummary,
+          chat_history: chatInterfaceRef.current?.getChatHistory() || []
         }),
       });
 
-      const data = await response.json();
+      console.log('Transfer API response status:', transferResponse.status);
+      
+      if (!transferResponse.ok) {
+        const errorText = await transferResponse.text();
+        console.error('Transfer API failed:', errorText);
+        throw new Error(`Transfer API failed with status ${transferResponse.status}: ${errorText}`);
+      }
 
-      if (data.success) {
-        // Now initiate the actual transfer
-        const transferResponse = await fetch('/api/transfer', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            original_room_name: room,
-            agent_a_id: name,
-            transfer_target: "agent_b",
-            caller_type: "investor",
-            email: "john.doe@example.com",
-            summary: data.summary
-          }),
-        });
+      const transferData = await transferResponse.json();
+      console.log('Transfer API response data:', transferData);
 
-        const transferData = await transferResponse.json();
+      if (transferData.transfer_room_name) {
+        setTransferStatus('in_progress');
+        setTransferSummary(finalSummary);
 
-        if (transferData.success && transferData.transfer_room_name) {
-          setTransferStatus('in_progress');
-          setTransferSummary(data.summary);
+        // Simple approach: Agent A and caller stay in current room
+        // Agent B will join this room - no room switching needed!
+        const transferRoomName = transferData.transfer_room_name;
 
-          // Switch Agent A to the transfer room
-          const transferRoomName = transferData.transfer_room_name;
-          const agentAToken = transferData.agent_a_token;
-
-          // Disconnect from original room
-          await roomInstance.disconnect();
-
-          // Connect to transfer room
-          await roomInstance.connect(
-            process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://your-livekit-server.com',
-            agentAToken
-          );
-
-          // Update room name and token
-          setToken(agentAToken);
-
-          // Send room switch message to customer in original room before disconnecting
-          const customerSwitchMessage = {
-            type: 'switch_to_transfer_room',
-            transfer_room_name: transferRoomName,
-            caller_token: transferData.caller_token,
-            summary: data.summary,
-            agent_a_id: name,
-            timestamp: new Date().toISOString()
-          };
-
-          try {
-            await roomInstance.localParticipant.publishData(
-              new TextEncoder().encode(JSON.stringify(customerSwitchMessage)),
-              { reliable: true }
-            );
-          } catch (e) {
-            console.error('Failed to send room switch message to customer:', e);
-          }
-
-          // Send data message in transfer room to notify Agent B
-          const agentBMessage = {
-            type: 'transfer_initiated',
-            summary: data.summary,
-            target_agent: 'agent_b',
-            transfer_room: transferRoomName,
-            timestamp: new Date().toISOString()
-          };
-
-          // Wait a moment for connection to establish
-          setTimeout(async () => {
-            try {
-              await roomInstance.localParticipant.publishData(
-                new TextEncoder().encode(JSON.stringify(agentBMessage)),
-                { reliable: true }
-              );
-            } catch (e) {
-              console.error('Failed to send transfer message:', e);
-            }
-          }, 1000);
-
-          alert(`🎉 Warm Transfer Initiated!\n\n📋 AI-Generated Summary:\n${data.summary}\n\n🏠 Switched to Transfer Room: ${transferRoomName}\n\n📞 Agent B can now join this transfer room.`);
-        } else {
-          setTransferStatus('idle');
-          alert(`Transfer initiated with summary:\n\n${data.summary}\n\nNote: Transfer room creation failed, but summary was generated successfully.`);
-        }
+        console.log(`✅ Transfer initiated! Agent B will join room: ${transferRoomName}`);
+        console.log('📋 Summary generated:', finalSummary);
+        
+        // Show success message - no complex room switching needed
+        alert(`🎉 Warm Transfer Initiated!\n\n📋 AI-Generated Summary:\n${finalSummary}\n\n🏠 Room: ${transferRoomName}\n\n� Agent B will join this room shortly.\n\nYou and the caller can continue the conversation while waiting.`);
       } else {
         setTransferStatus('idle');
-        alert(`Transfer initiated!\n\nNote: AI summary generation failed, using fallback summary.\n\nCall Summary: Customer called about login issues. I verified their account is active and helped reset their password. They can now log in but can't see their dashboard. They need immediate access to their financial data for a meeting this afternoon. Customer seems frustrated but cooperative.`);
+        console.error('Transfer failed - API returned:', transferData);
+        alert(`❌ Transfer Failed!\n\nError: ${transferData.error || 'Room creation failed'}\n\nGenerated Summary (for reference):\n${finalSummary}`);
       }
     } catch (error) {
       console.error('Transfer failed:', error);
       setTransferStatus('idle');
-      alert('Transfer failed. Please try again.');
+      alert(`❌ Transfer Failed!\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again or contact support.`);
     }
   };
 
@@ -471,7 +467,7 @@ export default function AgentAPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            room_name: room
+            room_name: currentRoom
           }),
         });
 
@@ -490,7 +486,7 @@ export default function AgentAPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            room_name: room,
+            room_name: currentRoom,
             agent_id: name
           }),
         });
@@ -629,7 +625,7 @@ export default function AgentAPage() {
                   <div className="flex items-center mt-1 space-x-2">
                     <span className="text-sm text-gray-500 font-medium">Room:</span>
                     <span className="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded border">
-                  {room}
+                  {currentRoom}
                 </span>
               </div>
             </div>
@@ -643,6 +639,36 @@ export default function AgentAPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-semibold text-gray-900">{nextCustomer?.email || 'No customer assigned'}</span>
                   <span className="text-xs text-gray-500">{roomInstance.localParticipant.identity}</span>
+                </div>
+                
+                {/* Transfer Controls */}
+                <div className="flex items-center gap-3">
+                  {transferStatus !== 'idle' && (
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${
+                        transferStatus === 'initiating' ? 'bg-yellow-500 animate-pulse' :
+                        transferStatus === 'in_progress' ? 'bg-orange-500 animate-pulse' :
+                        'bg-green-500'
+                      }`}></div>
+                      <span className="text-sm font-medium text-gray-700 capitalize">
+                        {transferStatus === 'initiating' ? 'Preparing Transfer...' :
+                         transferStatus === 'in_progress' ? 'Transfer in Progress' :
+                         'Transfer Complete'}
+                      </span>
+                    </div>
+                  )}
+                  
+                  <button
+                    onClick={initiateTransfer}
+                    disabled={transferStatus !== 'idle' || !nextCustomer}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+                    title="Transfer call to Agent B with conversation summary"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {transferStatus === 'idle' ? 'Transfer Call' : 'Transferring...'}
+                  </button>
                 </div>
               </div>
               {/* Video and controls stacked, controls pinned bottom, responsive */}

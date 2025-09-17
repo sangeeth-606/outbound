@@ -255,6 +255,8 @@ async def initiate_transfer(request: TransferInitiateRequest):
         transcription_active = is_room_transcription_active(request.original_room_name)
         transcription_segments = get_room_transcriptions(request.original_room_name)
         transcription_summary = get_transcription_summary(request.original_room_name)
+        transcription_status = "active" if transcription_active else "inactive"
+        transcription_error = None
 
         # Error handling for transcription failures
         if transcription_active and not transcription_segments:
@@ -293,105 +295,29 @@ async def initiate_transfer(request: TransferInitiateRequest):
         )
         logger.info(f"📝 Generated summary: {summary[:100]}...")
 
-        # Create new transfer room
-        transfer_room_name = f"transfer_{request.original_room_name}_{request.agent_a_id}"
-        logger.info(f"🏠 Creating transfer room: {transfer_room_name}")
-        await create_room(transfer_room_name)
+        # Use the ORIGINAL room for transfer - no need to create a new room
+        # Agent A and caller stay in original room, Agent B joins them
+        transfer_room_name = request.original_room_name
+        logger.info(f"🏠 Using original room for transfer: {transfer_room_name}")
 
-        # Generate tokens for all participants
-        logger.info("🎫 Generating access tokens for all participants")
-        agent_a_token = create_room_token(
-            room_name=transfer_room_name,
-            participant_identity=f"agent_{request.agent_a_id}"
-        )
-
+        # Generate token for Agent B to join the existing room
+        logger.info("🎫 Generating access token for Agent B to join existing room")
         agent_b_token = create_room_token(
             room_name=transfer_room_name,
             participant_identity="agent_b_transfer"
         )
 
-        caller_token = create_room_token(
-            room_name=transfer_room_name,
-            participant_identity=f"caller_{request.email}"
-        )
+        # Agent A and caller already have tokens and are in the room
+        agent_a_token = None  # Not needed - Agent A stays in current room
+        caller_token = None   # Not needed - caller stays in current room
 
-        # Disconnect Agent A from original room
-        logger.info(f"👋 Disconnecting Agent A from original room: {request.original_room_name}")
-        await disconnect_participant(request.original_room_name, f"agent_{request.agent_a_id}")
+        # NOTE: No room switching needed - Agent B simply joins the existing room
+        # This is much simpler and more intuitive than moving everyone to a new room
+        logger.info(f"🎫 Token generated for Agent B to join original room: {transfer_room_name}")
+        logger.info("🔄 Agent B will join the existing room where Agent A and caller are already connected")
 
-        # Send message to customer to switch to transfer room
-        logger.info(f"📢 Notifying customer to switch to transfer room: {transfer_room_name}")
-        customer_switch_message = {
-            "type": "switch_to_transfer_room",
-            "transfer_room_name": transfer_room_name,
-            "caller_token": caller_token,
-            "summary": summary,
-            "agent_a_id": request.agent_a_id
-        }
-        # Note: In a real implementation, you'd send this via LiveKit data channel to the customer
-        # For now, we'll broadcast it via WebSocket
-        await broadcast_websocket_message({
-            "type": "customer_room_switch",
-            "original_room": request.original_room_name,
-            "transfer_room": transfer_room_name,
-            "caller_token": caller_token,
-            "summary": summary
-        })
-
-        # Speak the call summary in the transfer room
+        # Speak the call summary in the original room
         await speak_summary(transfer_room_name, summary)
-
-        # Broadcast transfer initiation notification
-        notification = {
-            "type": "transfer_initiated",
-            "original_room": request.original_room_name,
-            "transfer_room": transfer_room_name,
-            "agent_a": request.agent_a_id,
-            "target_agent": target_agent
-        }
-        await broadcast_websocket_message(notification)
-
-        # Initiate Twilio call to target agent's phone number (optional)
-        twilio_call_sid = None
-        if request.transfer_target == "phone" and target_agent and target_agent.get("twilio_phone"):
-            try:
-                logger.info(f"📞 Initiating Twilio call to {target_agent['twilio_phone']}")
-                twilio_call_sid = await initiate_warm_transfer_call(
-                    target_agent["twilio_phone"],
-                    transfer_room_name,
-                    summary
-                )
-                logger.info(f"✅ Twilio call initiated: {twilio_call_sid}")
-            except Exception as e:
-                logger.error(f"❌ Twilio call failed (non-critical): {e}")
-                # Continue with web transfer even if Twilio fails
-
-        # Broadcast transfer initiation notification to Agent B in waiting room
-        logger.info("📡 Broadcasting transfer initiation to Agent B waiting room")
-        notification = {
-            "type": "transfer_initiated",
-            "original_room": request.original_room_name,
-            "transfer_room": transfer_room_name,
-            "agent_a": request.agent_a_id,
-            "target_agent": target_agent,
-            "summary": summary,
-            "agent_b_token": agent_b_token
-        }
-        await broadcast_websocket_message(notification)
-
-        # Determine transcription status for error handling
-        transcription_status = "none"
-        transcription_error = None
-
-        if transcription_active and not transcription_segments:
-            transcription_status = "failed"
-            transcription_error = "Transcription was active but failed to capture data"
-        elif transcription_segments:
-            transcription_status = "success"
-        elif transcription_active:
-            transcription_status = "active_no_data"
-        else:
-            transcription_status = "not_started"
 
         # Store transfer information for Agent B to retrieve
         transfer_data = {
@@ -411,17 +337,45 @@ async def initiate_transfer(request: TransferInitiateRequest):
             'caller_info': {
                 'email': request.email,
                 'caller_type': request.caller_type
-            }
+            },
+            'ready_to_join': True  # Agent B can join immediately since no room switching is needed
         }
         pending_transfers['agent_b'] = transfer_data
 
+        # No need for room switch notifications - everyone stays in the original room
+        # Just broadcast that transfer is ready for Agent B
+        await broadcast_websocket_message({
+            "type": "transfer_ready",
+            "original_room": request.original_room_name,
+            "transfer_room": transfer_room_name,
+            "summary": summary,
+            "message": "Transfer ready - Agent B can join the room"
+        })
+
+        # Optional: Initiate Twilio call for external agents
+        twilio_call_sid = None
+        if target_agent and target_agent.get('phone'):
+            try:
+                twilio_call_sid = await initiate_warm_transfer_call(
+                    target_agent['phone'], 
+                    transfer_room_name, 
+                    summary
+                )
+                logger.info(f"📞 Twilio call initiated: {twilio_call_sid}")
+            except Exception as e:
+                logger.warning(f"⚠️ Twilio call failed: {str(e)}")
+
+        # NOTE: No room switching needed - much simpler flow
+        # Agent A and caller stay in original room, Agent B joins them
+
         logger.info(f"🎉 Transfer initiated successfully: {transfer_room_name}")
+        logger.info("🔄 Agent B can now join the original room")
         return TransferInitiateResponse(
             transfer_room_name=transfer_room_name,
             summary=summary,
-            agent_a_token=agent_a_token,
+            agent_a_token=agent_a_token,  # Will be None - not needed
             agent_b_token=agent_b_token,
-            caller_token=caller_token,
+            caller_token=caller_token,    # Will be None - not needed
             twilio_call_sid=twilio_call_sid,
             target_agent=target_agent
         )
@@ -806,18 +760,74 @@ async def generate_call_summary_endpoint(request: dict):
             "error": str(e)
         }
 
+@app.post("/api/chat/summarize")
+async def summarize_chat_history(request: dict):
+    """Generate AI summary from chat history for warm transfer"""
+    try:
+        room_name = request.get("room_name")
+        conversation_text = request.get("conversation_text", "")
+        message_count = request.get("message_count", 0)
+        raw_messages = request.get("raw_messages", [])
+        
+        logger.info(f"🤖 Generating chat summary for room: {room_name} with {message_count} messages")
+        
+        if not conversation_text.strip():
+            return {
+                "success": True,
+                "summary": "No chat conversation available for this session.",
+                "message_count": 0
+            }
+        
+        # Generate AI summary using the existing function
+        summary = generate_call_summary(
+            conversation_text,
+            "investor",  # Default to investor for now
+            {"conversation_length": message_count}
+        )
+        
+        logger.info(f"✅ Generated chat summary: {summary[:100]}...")
+        
+        return {
+            "success": True,
+            "summary": summary,
+            "message_count": message_count,
+            "room_name": room_name,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to generate chat summary: {str(e)}")
+        return {
+            "success": False,
+            "summary": "Failed to generate conversation summary from chat history.",
+            "error": str(e)
+        }
+
 @app.get("/api/agent/transfer-status/{agent_id}")
 async def get_agent_transfer_status(agent_id: str):
     """Check if there's a pending transfer for a specific agent"""
     try:
         if agent_id in pending_transfers:
             transfer_info = pending_transfers[agent_id]
-            return {
-                "success": True,
-                "has_pending_transfer": True,
-                "transfer_details": transfer_info,
-                "message": "Transfer available"
-            }
+            
+            # Only return the transfer if it's ready for Agent B to join
+            # This prevents Agent B from joining before Agent A and caller have switched
+            ready_to_join = transfer_info.get('ready_to_join', False)
+            
+            if ready_to_join:
+                return {
+                    "success": True,
+                    "has_pending_transfer": True,
+                    "transfer_details": transfer_info,
+                    "message": "Transfer ready for Agent B to join"
+                }
+            else:
+                return {
+                    "success": True,
+                    "has_pending_transfer": False,
+                    "transfer_details": None,
+                    "message": "Transfer pending - waiting for room switch completion"
+                }
         else:
             return {
                 "success": True,
@@ -1065,6 +1075,37 @@ async def get_transcription(request: GetTranscriptionRequest):
             transcripts=[],
             message=f"Failed to get transcription: {str(e)}"
         )
+
+@app.post("/api/agent/notify-transfer")
+async def notify_agent_transfer(request: dict):
+    """Notify agent that transfer is ready to join"""
+    try:
+        agent_id = request.get("agent_id")
+        action = request.get("action")
+        
+        logger.info(f"🔔 Notifying {agent_id} to {action}")
+        
+        if action == "join_transfer_room" and agent_id in pending_transfers:
+            # Mark the transfer as ready for the agent to join
+            pending_transfers[agent_id]["ready_to_join"] = True
+            logger.info(f"✅ Transfer marked as ready for {agent_id}")
+            
+            return {
+                "success": True,
+                "message": f"Agent {agent_id} notified to join transfer room"
+            }
+        else:
+            return {
+                "success": False,
+                "message": f"No pending transfer found for {agent_id} or invalid action"
+            }
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to notify agent transfer: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
