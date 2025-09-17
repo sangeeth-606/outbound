@@ -14,6 +14,9 @@ import { useEffect, useState } from 'react';
 import { Phone, MessageSquare, Users, PhoneOff, User } from 'lucide-react';
 import ChatInterface from '../../components/ChatInterface';
 import LiveKitChatInterface from '../../components/LiveKitChatInterface';
+import MiniLiveTranscription from '../../components/MiniLiveTranscription';
+import { DeepgramContextProvider } from '../context/DeepgramContextProvider';
+import { MicrophoneContextProvider } from '../context/MicrophoneContextProvider';
 
 export default function CallerPage() {
   const room = 'support_room';
@@ -503,18 +506,20 @@ export default function CallerPage() {
   }
 
   return (
-    <RoomContext.Provider value={roomInstance}>
-      <div className="min-h-screen h-screen w-full bg-gray-50 text-gray-900 flex flex-col font-sans antialiased">
-        <header className="w-full py-4 px-6 border-b border-gray-200 bg-white shadow-sm">
-          <div className="flex items-start">
-            <div className="flex flex-col">
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight leading-tight">
-                Support Call in Progress
-              </h1>
-              <div className="flex items-center mt-1 space-x-2">
-                <span className="text-sm text-gray-500 font-medium">Room:</span>
-                <span className="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded border">
-                  {currentRoom}
+    <DeepgramContextProvider>
+      <MicrophoneContextProvider>
+        <RoomContext.Provider value={roomInstance}>
+          <div className="min-h-screen h-screen w-full bg-gray-50 text-gray-900 flex flex-col font-sans antialiased">
+            <header className="w-full py-4 px-6 border-b border-gray-200 bg-white shadow-sm">
+              <div className="flex items-start">
+                <div className="flex flex-col">
+                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight leading-tight">
+                    Support Call in Progress
+                  </h1>
+                  <div className="flex items-center mt-1 space-x-2">
+                    <span className="text-sm text-gray-500 font-medium">Room:</span>
+                    <span className="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded border">
+                      {currentRoom}
                 </span>
               </div>
             </div>
@@ -564,8 +569,13 @@ export default function CallerPage() {
             </aside>
           </section>
         </main>
+        
+        {/* Mini Live Transcription Component */}
+        <MiniLiveTranscription />
       </div>
     </RoomContext.Provider>
+      </MicrophoneContextProvider>
+    </DeepgramContextProvider>
   );
 }
 
