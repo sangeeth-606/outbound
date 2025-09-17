@@ -257,7 +257,7 @@ export default function AgentBPage() {
 
   return (
     <RoomContext.Provider value={roomInstance}>
-      <div className="min-h-screen bg-white text-black">
+      <div className="min-h-screen bg-gray-50 text-gray-900">
         <div className="container mx-auto px-4 py-8">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
@@ -272,7 +272,7 @@ export default function AgentBPage() {
               {/* Video Conference */}
               <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
                 <h2 className="text-xl font-semibold mb-4">Transfer Call</h2>
-                <div data-lk-theme="default" style={{ height: '400px' }}>
+                <div style={{ height: '400px' }}>
                   <MyVideoConference />
                   <RoomAudioRenderer />
                   <ControlBar />
@@ -449,8 +449,21 @@ function MyVideoConference() {
     { onlySubscribed: false },
   );
   return (
-    <GridLayout tracks={tracks} style={{ height: 'calc(100% - 60px)' }}>
-      <ParticipantTile />
+    <GridLayout 
+      tracks={tracks} 
+      style={{ 
+        height: 'calc(100% - 60px)', 
+        width: '100%',
+        backgroundColor: '#1f2937'
+      }}
+    >
+      <ParticipantTile 
+        style={{
+          backgroundColor: '#374151',
+          borderRadius: '8px',
+          minHeight: '200px'
+        }}
+      />
     </GridLayout>
   );
 }

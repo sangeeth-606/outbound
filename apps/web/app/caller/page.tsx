@@ -349,11 +349,11 @@ export default function CallerPage() {
 
   if (isConnecting || queueStatus === 'connecting') {
     return (
-      <div className="min-h-screen bg-white text-black flex items-center justify-center">
-        <div className="bg-gray-100 rounded-lg shadow-md p-8 max-w-md mx-auto border border-gray-200">
-          <div className="animate-spin w-8 h-8 border-2 border-black border-t-transparent rounded-full mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold mb-2">Connecting...</h2>
-          <p className="text-gray-600">Please wait while we connect you to support</p>
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex items-center justify-center font-sans antialiased">
+        <div className="bg-white rounded-lg shadow-md p-8 max-w-md mx-auto border border-gray-200">
+          <div className="animate-spin w-8 h-8 border-2 border-red-400 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <h2 className="text-xl font-bold mb-2 text-gray-900 tracking-tight">Connecting...</h2>
+          <p className="text-gray-600 font-medium">Please wait while we connect you to support</p>
         </div>
       </div>
     );
@@ -361,24 +361,24 @@ export default function CallerPage() {
 
   if (queueStatus === 'waiting') {
     return (
-      <div className="min-h-screen bg-white text-black flex items-center justify-center">
-        <div className="bg-gray-100 rounded-lg shadow-md p-8 max-w-md mx-auto border border-gray-200">
-          <div className="animate-pulse w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
-            <Users className="w-8 h-8 text-black" />
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex items-center justify-center font-sans antialiased">
+        <div className="bg-white rounded-lg shadow-md p-8 max-w-md mx-auto border border-gray-200">
+          <div className="animate-pulse w-16 h-16 bg-red-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+            <Users className="w-8 h-8 text-red-400" />
           </div>
-          <h2 className="text-xl font-semibold mb-2">Waiting in Queue</h2>
-          <p className="text-gray-600 mb-4">All our agents are currently busy. You're in the queue to speak with support.</p>
+          <h2 className="text-xl font-bold mb-2 text-gray-900 tracking-tight">Waiting in Queue</h2>
+          <p className="text-gray-600 mb-4 font-medium">All our agents are currently busy. You're in the queue to speak with support.</p>
 
           {queuePosition && (
-            <div className="bg-gray-200 border border-gray-300 rounded-lg p-4 mb-4">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-black font-medium">Your Position:</span>
-                <span className="text-black font-bold text-lg">#{queuePosition}</span>
+                <span className="text-gray-700 font-semibold">Your Position:</span>
+                <span className="text-red-400 font-bold text-lg tracking-tight">#{queuePosition}</span>
               </div>
               {estimatedWaitTime && (
                 <div className="flex items-center justify-between">
-                  <span className="text-black font-medium">Estimated Wait:</span>
-                  <span className="text-black font-bold">
+                  <span className="text-gray-700 font-semibold">Estimated Wait:</span>
+                  <span className="text-red-400 font-bold tracking-tight">
                     {Math.floor(estimatedWaitTime / 60)}:{(estimatedWaitTime % 60).toString().padStart(2, '0')}
                   </span>
                 </div>
@@ -397,7 +397,7 @@ export default function CallerPage() {
                 setQueuePosition(null);
                 setEstimatedWaitTime(null);
               }}
-              className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+              className="bg-red-400 hover:bg-red-500 text-white px-6 py-3 rounded-lg font-bold tracking-wide transition-colors"
             >
               Cancel
             </button>
@@ -409,8 +409,8 @@ export default function CallerPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-white text-black flex items-center justify-center">
-        <div className="bg-red-100 border border-red-400 text-red-700 p-4 rounded-lg max-w-md mx-auto">
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex items-center justify-center font-sans antialiased">
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg max-w-md mx-auto font-semibold">
           Error: {error}
         </div>
       </div>
@@ -419,34 +419,30 @@ export default function CallerPage() {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white text-black flex flex-col">
-        {/* Header */}
-        <header className="w-full py-10 px-4 text-center">
-          <h1 className="text-4xl font-bold mb-2 text-blue-900">Customer Support</h1>
-          <p className="text-lg text-blue-700">Connect with our support team for assistance</p>
-        </header>
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans antialiased">
+        
         {/* Main Content */}
-        <main className="flex-1 w-full flex flex-col md:flex-row gap-0 md:gap-8 px-2 md:px-8 lg:px-20 pb-8">
-          {/* Call Form */}
-          <section className="flex-1 flex flex-col justify-center md:pr-8 mb-8 md:mb-0">
-            <h2 className="text-2xl font-semibold mb-6 text-gray-900">Start Your Call</h2>
+        <main className="flex-1 w-full flex justify-center items-center px-4 md:px-8 lg:px-20 pb-8">
+          {/* Call Form - Centered */}
+          <section className="w-full max-w-md">
+            <h2 className="text-2xl font-semibold mb-6 text-gray-900 text-center tracking-tight">Start Your Call</h2>
             <form className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Your Email Address</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 tracking-wide">Your Email Address</label>
                 <input
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 bg-white text-gray-900 font-medium placeholder:text-gray-500 placeholder:font-normal"
                   placeholder="you@example.com"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Caller Type</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 tracking-wide">Caller Type</label>
                 <select
                   value={callerType}
                   onChange={e => setCallerType(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 bg-white text-gray-900 font-medium"
                 >
                   <option value="investor">Investor</option>
                   <option value="prospect">Prospect</option>
@@ -455,21 +451,11 @@ export default function CallerPage() {
               <button
                 type="button"
                 onClick={connectToCall}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors mt-2"
+                className="w-full bg-red-400 hover:bg-red-500 text-white px-6 py-3 rounded-lg font-bold tracking-wide transition-colors mt-2 text-base"
               >
                 Start Call
               </button>
             </form>
-          </section>
-          {/* Chat Preview */}
-          <section className="flex-1 flex flex-col justify-center md:pl-8">
-            <h2 className="text-2xl font-semibold mb-6 text-green-700">Live Chat Interface Preview</h2>
-            <div className="w-full max-w-xl mx-auto">
-              <LiveKitChatInterface 
-                room={roomInstance}
-                localUserType="caller"
-              />
-            </div>
           </section>
         </main>
       </div>
@@ -478,7 +464,7 @@ export default function CallerPage() {
 
   if (showChat) {
     return (
-      <div className="min-h-screen bg-white text-black">
+      <div className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased">
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-6xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -488,12 +474,12 @@ export default function CallerPage() {
                   email={email}
                 />
               </div>
-              <div className="bg-gray-100 rounded-lg shadow-md p-6 border border-gray-200">
-                <h2 className="text-xl font-semibold mb-4">AI Chat Demo</h2>
+              <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                <h2 className="text-xl font-bold mb-4 text-gray-900 tracking-tight">AI Chat Demo</h2>
                 <div className="space-y-4">
-                  <div className="bg-blue-100 border border-blue-400 rounded-lg p-4">
-                    <h3 className="font-semibold text-blue-700 mb-2">Features Available</h3>
-                    <ul className="text-gray-600 text-sm space-y-1">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <h3 className="font-bold text-red-700 mb-2 tracking-wide">Features Available</h3>
+                    <ul className="text-gray-600 text-sm space-y-1 font-medium">
                       <li>• Voice-to-text transcription</li>
                       <li>• Context-aware AI responses</li>
                       <li>• Text-to-speech playback</li>
@@ -504,7 +490,7 @@ export default function CallerPage() {
                 </div>
                 <button
                   onClick={() => setShowChat(false)}
-                  className="w-full mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                  className="w-full mt-6 bg-red-400 hover:bg-red-500 text-white px-6 py-3 rounded-lg font-bold tracking-wide transition-colors"
                 >
                   Close Chat Demo
                 </button>
@@ -518,33 +504,42 @@ export default function CallerPage() {
 
   return (
     <RoomContext.Provider value={roomInstance}>
-      <div className="min-h-screen h-screen w-full bg-gradient-to-br from-blue-50 to-white text-black flex flex-col">
-        <header className="w-full py-6 px-4 text-center border-b border-gray-100">
-          <h1 className="text-3xl md:text-4xl font-bold mb-1 text-blue-900">Support Call in Progress</h1>
-          <p className="text-blue-700 text-base">Room: <span className="font-mono text-black">{currentRoom}</span></p>
+      <div className="min-h-screen h-screen w-full bg-gray-50 text-gray-900 flex flex-col font-sans antialiased">
+        <header className="w-full py-4 px-6 border-b border-gray-200 bg-white shadow-sm">
+          <div className="flex items-start">
+            <div className="flex flex-col">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight leading-tight">
+                Support Call in Progress
+              </h1>
+              <div className="flex items-center mt-1 space-x-2">
+                <span className="text-sm text-gray-500 font-medium">Room:</span>
+                <span className="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded border">
+                  {currentRoom}
+                </span>
+              </div>
+            </div>
+          </div>
         </header>
         <main className="flex-1 w-full flex flex-row h-full overflow-hidden">
           {/* Unified container for video and chat */}
           <section className="flex flex-1 flex-row h-full w-full">
             {/* Video Conference - left side */}
             <div className="flex-1 flex flex-col h-full min-w-0">
-              <div className="flex flex-row items-center justify-between px-6 py-4 border-b border-gray-100 bg-white">
+              <div className="flex flex-row items-center justify-between px-6 py-4 border-b border-gray-200 bg-white">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg font-semibold text-gray-900">{email}</span>
-                  <span className="text-xs text-gray-500">{roomInstance.localParticipant.identity}</span>
+                  <span className="text-lg font-bold text-gray-900 tracking-tight">{email}</span>
+                  <span className="text-xs text-gray-500 font-medium">{roomInstance.localParticipant.identity}</span>
                 </div>
                 {/* Removed custom Leave button, rely on ControlBar */}
               </div>
               {/* Video and controls stacked, controls pinned bottom, responsive */}
-              <div className="flex-1 flex flex-col bg-white min-h-0">
-                <div className="flex-1 min-h-0 flex flex-col justify-center">
+              <div className="flex-1 flex flex-col bg-gray-100 min-h-0">
+                <div className="flex-1 min-h-0 p-4">
                   <MyVideoConference />
                   <RoomAudioRenderer />
                 </div>
-                <div className="w-full border-t border-gray-200 bg-white px-2 py-2 flex-shrink-0 flex justify-center shadow-sm z-10" data-lk-theme="default">
-                  <div className="max-w-[520px] w-full overflow-x-auto flex flex-nowrap">
-                    <ControlBar />
-                  </div>
+                <div className="w-full border-t border-gray-200 bg-white px-4 py-3 flex-shrink-0 flex justify-center shadow-sm z-10">
+                  <ControlBar />
                 </div>
               </div>
             </div>
@@ -553,11 +548,11 @@ export default function CallerPage() {
             {/* Chat - right side */}
             <aside className="w-full max-w-[380px] flex flex-col h-full bg-white">
               <div className="flex flex-col h-full px-0 py-0">
-                <div className="px-6 py-4 border-b border-gray-100">
-                  <h2 className="text-xl font-semibold text-green-700 flex items-center gap-2">
+                {/* <div className="px-6 py-4 border-b border-gray-200">
+                  <h2 className="text-xl font-bold text-red-400 flex items-center gap-2 tracking-tight">
                     <span role="img" aria-label="chat">🔥</span> Live Chat
                   </h2>
-                </div>
+                </div> */}
                 <div className="flex-1 min-h-0">
                   <LiveKitChatInterface 
                     room={roomInstance}
@@ -582,9 +577,25 @@ function MyVideoConference() {
     ],
     { onlySubscribed: false },
   );
+  
   return (
-    <GridLayout tracks={tracks} style={{ height: 'calc(100% - 60px)' }}>
-      <ParticipantTile />
-    </GridLayout>
+    <div className="w-full h-full bg-gray-900 rounded-lg overflow-hidden relative">
+      <GridLayout 
+        tracks={tracks} 
+        style={{ 
+          height: '100%', 
+          width: '100%',
+          backgroundColor: '#1f2937'
+        }}
+      >
+        <ParticipantTile 
+          style={{
+            backgroundColor: '#374151',
+            borderRadius: '8px',
+            minHeight: '200px'
+          }}
+        />
+      </GridLayout>
+    </div>
   );
 }

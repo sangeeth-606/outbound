@@ -542,55 +542,62 @@ export default function AgentAPage() {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-white text-black flex flex-col">
-        <header className="w-full py-10 px-4 text-center">
-          <h1 className="text-4xl font-bold mb-2 text-blue-900">Agent A Dashboard</h1>
-          <p className="text-lg text-blue-700">First-line support specialist ready to take calls</p>
-        </header>
-        <main className="flex-1 w-full flex flex-col md:flex-row gap-0 md:gap-8 px-2 md:px-8 lg:px-20 pb-8">
-          <section className="flex-1 flex flex-col justify-center md:pr-8 mb-8 md:mb-0">
-            <h2 className="text-2xl font-semibold mb-6 text-gray-900">Ready to Take Calls</h2>
-            <div className="space-y-3">
-              {agentStatus === 'offline' ? (
-                <button
-                  onClick={startTakingCalls}
-                  className="w-full bg-black hover:bg-gray-800 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                >
-                  Start Taking Calls
-                </button>
-              ) : agentStatus === 'available' ? (
-                <div className="space-y-3">
-                  <div className="bg-green-100 border border-green-400 rounded-lg p-4 text-center">
-                    <div className="animate-pulse w-4 h-4 bg-green-500 rounded-full mx-auto mb-2"></div>
-                    <p className="text-green-700 font-medium">Available for calls</p>
-                    <p className="text-gray-600 text-sm">Waiting for customers...</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto px-4 py-16">
+          <div className="text-center mb-12">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">
+              Agent A Dashboard
+            </h1>
+            <p className="text-gray-600">
+              First-line support specialist
+            </p>
+          </div>
+
+          <div className="max-w-4xl mx-auto flex justify-center">
+            <div className="max-w-md w-full">
+              <h2 className="text-2xl font-semibold mb-6 text-gray-900 text-center">Ready to Take Calls</h2>
+              <div className="space-y-4">
+                {agentStatus === 'offline' ? (
+                  <button
+                    onClick={startTakingCalls}
+                    className="w-full bg-red-400 hover:bg-red-500 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                  >
+                    Start Taking Calls
+                  </button>
+                ) : agentStatus === 'available' ? (
+                  <div className="space-y-4">
+                    <div className="bg-green-100 border border-green-400 rounded-lg p-6 text-center">
+                      <div className="animate-pulse w-4 h-4 bg-green-500 rounded-full mx-auto mb-2"></div>
+                      <p className="text-green-700 font-medium">Available for calls</p>
+                      <p className="text-gray-600 text-sm">Waiting for customers...</p>
+                    </div>
+                    <button
+                      onClick={pickNextCustomer}
+                      disabled={isPickingCustomer}
+                      className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                    >
+                      {isPickingCustomer ? 'Connecting...' : 'Pick Next Customer'}
+                    </button>
+                    <button
+                      onClick={stopTakingCalls}
+                      className="w-full bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                    >
+                      Stop Taking Calls
+                    </button>
                   </div>
-                  <button
-                    onClick={pickNextCustomer}
-                    disabled={isPickingCustomer}
-                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                  >
-                    {isPickingCustomer ? 'Connecting...' : 'Pick Next Customer'}
-                  </button>
-                  <button
-                    onClick={stopTakingCalls}
-                    className="w-full bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                  >
-                    Stop Taking Calls
-                  </button>
-                </div>
-              ) : (
-                <div className="bg-orange-100 border border-orange-400 rounded-lg p-4 text-center">
-                  <div className="animate-pulse w-4 h-4 bg-orange-500 rounded-full mx-auto mb-2"></div>
-                  <p className="text-orange-700 font-medium">On a call</p>
-                  {nextCustomer && (
-                    <p className="text-gray-600 text-sm">Customer: {nextCustomer.email}</p>
-                  )}
-                </div>
-              )}
+                ) : (
+                  <div className="bg-orange-100 border border-orange-400 rounded-lg p-6 text-center">
+                    <div className="animate-pulse w-4 h-4 bg-orange-500 rounded-full mx-auto mb-2"></div>
+                    <p className="text-orange-700 font-medium">On a call</p>
+                    {nextCustomer && (
+                      <p className="text-gray-600 text-sm">Customer: {nextCustomer.email}</p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </section>
-        </main>
+          </div>
+        </div>
       </div>
     );
   }
@@ -598,10 +605,21 @@ export default function AgentAPage() {
   // Connected state: unified, responsive, modern layout
   return (
     <RoomContext.Provider value={roomInstance}>
-      <div className="min-h-screen h-screen w-full bg-gradient-to-br from-blue-50 to-white text-black flex flex-col">
-        <header className="w-full py-6 px-4 text-center border-b border-gray-100">
-          <h1 className="text-3xl md:text-4xl font-bold mb-1 text-blue-900">Agent A Call in Progress</h1>
-          <p className="text-blue-700 text-base">Room: <span className="font-mono text-black">{room}</span></p>
+      <div className="min-h-screen h-screen w-full bg-gray-50 text-gray-900 flex flex-col font-sans antialiased">
+        <header className="w-full py-4 px-6 border-b border-gray-200 bg-white shadow-sm">
+          <div className="flex items-start">
+            <div className="flex flex-col">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight leading-tight">
+                Agent A Call in Progress
+              </h1>
+              <div className="flex items-center mt-1 space-x-2">
+                <span className="text-sm text-gray-500 font-medium">Room:</span>
+                <span className="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded border">
+                  {room}
+                </span>
+              </div>
+            </div>
+          </div>
         </header>
         <main className="flex-1 w-full flex flex-row h-full overflow-hidden">
           <section className="flex flex-1 flex-row h-full w-full">
@@ -621,10 +639,8 @@ export default function AgentAPage() {
                       <MyVideoConference />
                       <RoomAudioRenderer />
                     </div>
-                    <div className="w-full border-t border-gray-200 bg-white px-2 py-2 flex-shrink-0 flex justify-center shadow-sm z-10" data-lk-theme="default">
-                      <div className="max-w-[520px] w-full overflow-x-auto flex flex-nowrap">
-                        <ControlBar />
-                      </div>
+                    <div className="w-full border-t border-gray-200 bg-white px-4 py-3 flex-shrink-0 flex justify-center shadow-sm z-10">
+                      <ControlBar />
                     </div>
                   </>
                 )}
@@ -635,11 +651,11 @@ export default function AgentAPage() {
             {/* Chat - right side */}
             <aside className="w-full max-w-[380px] flex flex-col h-full bg-white">
               <div className="flex flex-col h-full px-0 py-0">
-                <div className="px-6 py-4 border-b border-gray-100">
+                {/* <div className="px-6 py-4 border-b border-gray-100">
                   <h2 className="text-xl font-semibold text-green-700 flex items-center gap-2">
                     <span role="img" aria-label="chat">🔥</span> Live Chat
                   </h2>
-                </div>
+                </div> */}
                 <div className="flex-1 min-h-0">
                   <LiveKitChatInterface 
                     room={roomInstance}
@@ -665,8 +681,21 @@ function MyVideoConference() {
     { onlySubscribed: false },
   );
   return (
-    <GridLayout tracks={tracks} style={{ height: 'calc(100% - 60px)' }}>
-      <ParticipantTile />
+    <GridLayout 
+      tracks={tracks} 
+      style={{ 
+        height: 'calc(100% - 60px)', 
+        width: '100%',
+        backgroundColor: '#1f2937'
+      }}
+    >
+      <ParticipantTile 
+        style={{
+          backgroundColor: '#374151',
+          borderRadius: '8px',
+          minHeight: '200px'
+        }}
+      />
     </GridLayout>
   );
 }

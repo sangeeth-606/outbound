@@ -145,32 +145,32 @@ export default function LiveKitChatInterface({
   };
 
   return (
-    <div className={`flex flex-col h-full bg-white rounded-lg shadow-lg border border-gray-200 ${className}`}>
+    <div className={`flex flex-col h-full bg-white rounded-lg shadow-lg border border-gray-200 font-sans antialiased ${className}`}>
       {/* Chat Header */}
-      <div className="bg-blue-600 text-white p-3 rounded-t-lg flex items-center space-x-2">
+      <div className="bg-red-400 text-white p-3 rounded-t-lg flex items-center space-x-2">
         <MessageSquare className="w-5 h-5" />
         <div>
-          <h3 className="text-sm font-semibold">Live Chat</h3>
-          <p className="text-xs text-blue-200">
+          <h3 className="text-sm font-bold tracking-tight">Live Chat</h3>
+          <p className="text-xs text-red-100 font-medium">
             {isConnected ? 'Connected' : 'Disconnected'} • {localUserType === 'caller' ? 'Customer' : 'Agent'} View
           </p>
         </div>
         <div className="ml-auto">
-          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
+          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-200'}`}></div>
         </div>
       </div>
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
         {messages.length === 0 && (
-          <div className="text-center text-gray-500 text-sm py-4">
+          <div className="text-center text-gray-600 text-sm py-4 font-medium">
             {isConnected 
               ? 'Chat is ready. Send a message to start the conversation!'
               : (
                 <div className="space-y-2">
-                  <p>💬 Live Chat Interface</p>
-                  <p className="text-xs">This will be active when connected to a call</p>
-                  <p className="text-xs">You can type messages and they'll be sent in real-time</p>
+                  <p className="font-semibold">💬 Live Chat Interface</p>
+                  <p className="text-xs text-gray-500">This will be active when connected to a call</p>
+                  <p className="text-xs text-gray-500">You can type messages and they'll be sent in real-time</p>
                 </div>
               )
             }
@@ -183,20 +183,20 @@ export default function LiveKitChatInterface({
             className={`flex ${message.isLocal ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] px-3 py-2 rounded-lg text-sm ${
+              className={`max-w-[80%] px-3 py-2 rounded-lg text-sm font-medium ${
                 message.isLocal
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-red-400 text-white'
                   : 'bg-gray-100 text-gray-800'
               }`}
             >
               <div className="flex items-center space-x-2 mb-1">
-                <span className={`text-xs font-medium ${
-                  message.isLocal ? 'text-blue-200' : 'text-gray-600'
+                <span className={`text-xs font-semibold tracking-wide ${
+                  message.isLocal ? 'text-red-100' : 'text-gray-600'
                 }`}>
                   {getSenderDisplayName(message)}
                 </span>
-                <span className={`text-xs ${
-                  message.isLocal ? 'text-blue-200' : 'text-gray-500'
+                <span className={`text-xs font-medium ${
+                  message.isLocal ? 'text-red-100' : 'text-gray-500'
                 }`}>
                   {message.timestamp.toLocaleTimeString([], { 
                     hour: '2-digit', 
@@ -220,21 +220,21 @@ export default function LiveKitChatInterface({
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder={isConnected ? "Type a message..." : "Waiting for connection..."}
-            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent font-medium text-gray-900 placeholder:text-gray-500"
             disabled={!isConnected}
             maxLength={1000}
           />
           <button
             type="submit"
             disabled={!isConnected || !inputMessage.trim()}
-            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-2 bg-red-400 text-white rounded-lg hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
             title="Send message"
           >
             <Send className="w-4 h-4" />
           </button>
         </form>
         {!isConnected && (
-          <p className="text-xs text-gray-500 mt-1 text-center">
+          <p className="text-xs text-gray-500 mt-1 text-center font-medium">
             Chat will be available once connected to the call
           </p>
         )}
