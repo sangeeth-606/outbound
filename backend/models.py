@@ -22,6 +22,8 @@ class TransferInitiateRequest(BaseModel):
     transfer_target: str = "compliance"  # "compliance" or "general_partner"
     caller_type: str = "investor"
     email: str
+    summary: Optional[str] = None  # Frontend-generated summary from chat history
+    chat_history: Optional[List[Dict[str, Any]]] = None  # Chat history for context
 
 class TransferInitiateResponse(BaseModel):
     transfer_room_name: str

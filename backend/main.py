@@ -248,52 +248,64 @@ async def initiate_transfer(request: TransferInitiateRequest):
 
         logger.info(f"👤 Target agent: {target_agent}")
 
-        # Generate dynamic call summary using LLM with transcription context
-        logger.info("🤖 Generating call summary with LLM...")
-
-        # Check transcription status and handle errors
-        transcription_active = is_room_transcription_active(request.original_room_name)
-        transcription_segments = get_room_transcriptions(request.original_room_name)
-        transcription_summary = get_transcription_summary(request.original_room_name)
-        transcription_status = "active" if transcription_active else "inactive"
-        transcription_error = None
-
-        # Error handling for transcription failures
-        if transcription_active and not transcription_segments:
-            logger.warning(f"⚠️  Transcription was active for room {request.original_room_name} but no segments found - possible transcription failure")
-            conversation_context = "Transcription service encountered an issue during the call. Customer conversation context may be incomplete."
-        elif transcription_segments:
-            # Create rich context with timestamps and speakers
-            conversation_context = f"Call transcription with {len(transcription_segments)} segments:\n"
-            for segment in transcription_segments[-10:]:  # Last 10 segments for context
-                speaker = segment.get('speaker', 'unknown')
-                text = segment.get('text', '').strip()
-                timestamp = segment.get('timestamp', 'unknown')
-                if text:
-                    conversation_context += f"[{timestamp}] {speaker}: {text}\n"
-
-            # Add summary if available
-            if transcription_summary:
-                conversation_context += f"\nSummary: {transcription_summary}"
-
-            logger.info(f"📝 Using detailed transcription context: {len(transcription_segments)} segments")
-        elif transcription_summary:
-            conversation_context = transcription_summary
-            logger.info(f"📝 Using transcription summary: {transcription_summary[:100]}...")
+        # Use the summary provided by Agent A from chat history (frontend already generated it)
+        # This is more accurate than generating from transcription data
+        if hasattr(request, 'summary') and request.summary and request.summary.strip():
+            summary = request.summary
+            logger.info(f"📝 Using frontend-provided summary: {summary[:100]}...")
+            # Initialize transcription variables for consistent data structure
+            transcription_segments = []
+            transcription_summary = ""
+            transcription_active = False
+            transcription_status = "inactive"
+            transcription_error = None
         else:
-            if transcription_active:
-                conversation_context = "Transcription service failed to capture conversation. Please ask the customer to repeat key details."
-                logger.error(f"❌ Transcription active but no data captured for room {request.original_room_name}")
-            else:
-                conversation_context = "Customer conversation context not available - transcription was not started for this call"
-                logger.info("📝 No transcription data available, using fallback context")
+            # Fallback: Generate summary using LLM with transcription context
+            logger.info("🤖 No summary provided, generating call summary with LLM...")
 
-        summary = generate_call_summary(
-            conversation_context,
-            request.caller_type,
-            caller_context
-        )
-        logger.info(f"📝 Generated summary: {summary[:100]}...")
+            # Check transcription status and handle errors
+            transcription_active = is_room_transcription_active(request.original_room_name)
+            transcription_segments = get_room_transcriptions(request.original_room_name)
+            transcription_summary = get_transcription_summary(request.original_room_name)
+            transcription_status = "active" if transcription_active else "inactive"
+            transcription_error = None
+
+            # Error handling for transcription failures
+            if transcription_active and not transcription_segments:
+                logger.warning(f"⚠️  Transcription was active for room {request.original_room_name} but no segments found - possible transcription failure")
+                conversation_context = "Transcription service encountered an issue during the call. Customer conversation context may be incomplete."
+            elif transcription_segments:
+                # Create rich context with timestamps and speakers
+                conversation_context = f"Call transcription with {len(transcription_segments)} segments:\n"
+                for segment in transcription_segments[-10:]:  # Last 10 segments for context
+                    speaker = segment.get('speaker', 'unknown')
+                    text = segment.get('text', '').strip()
+                    timestamp = segment.get('timestamp', 'unknown')
+                    if text:
+                        conversation_context += f"[{timestamp}] {speaker}: {text}\n"
+
+                # Add summary if available
+                if transcription_summary:
+                    conversation_context += f"\nSummary: {transcription_summary}"
+
+                logger.info(f"📝 Using detailed transcription context: {len(transcription_segments)} segments")
+            elif transcription_summary:
+                conversation_context = transcription_summary
+                logger.info(f"📝 Using transcription summary: {transcription_summary[:100]}...")
+            else:
+                if transcription_active:
+                    conversation_context = "Transcription service failed to capture conversation. Please ask the customer to repeat key details."
+                    logger.error(f"❌ Transcription active but no data captured for room {request.original_room_name}")
+                else:
+                    conversation_context = "Customer conversation context not available - transcription was not started for this call"
+                    logger.info("📝 No transcription data available, using fallback context")
+
+            summary = generate_call_summary(
+                conversation_context,
+                request.caller_type,
+                caller_context
+            )
+            logger.info(f"📝 Generated fallback summary: {summary[:100]}...")
 
         # Use the ORIGINAL room for transfer - no need to create a new room
         # Agent A and caller stay in original room, Agent B joins them
