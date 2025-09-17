@@ -64,11 +64,8 @@ const DeepgramContextProvider: FunctionComponent<
       const token = await getToken();
       console.log("Connecting to Deepgram with token:", token.substring(0, 10) + "...");
       
-      // Create the client with specific configuration
-      const deepgram = createClient({ 
-        accessToken: token,
-        global: { url: 'wss://api.deepgram.com' }
-      });
+      // Create the client with the token
+      const deepgram = createClient(token);
 
       const conn = deepgram.listen.live(options, endpoint);
 
