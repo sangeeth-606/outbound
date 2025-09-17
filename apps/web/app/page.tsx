@@ -86,6 +86,9 @@ export default function Home() {
               <Link href="/support" className="text-gray-700 hover:text-gray-900 font-medium">
                 TEAM
               </Link>
+              <Link href="/live-transcribe" className="text-gray-700 hover:text-gray-900 font-medium">
+                LIVE TRANSCRIBE
+              </Link>
             </nav>
 
             {/* CTA Buttons */}
