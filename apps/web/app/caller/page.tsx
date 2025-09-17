@@ -10,10 +10,10 @@ import {
 } from '@livekit/components-react';
 import { Room, Track, RoomEvent } from 'livekit-client';
 import '@livekit/components-styles';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Phone, MessageSquare, Users, PhoneOff, User } from 'lucide-react';
 import ChatInterface from '../../components/ChatInterface';
-import LiveKitChatInterface from '../../components/LiveKitChatInterface';
+import LiveKitChatInterface, { LiveKitChatInterfaceRef } from '../../components/LiveKitChatInterface';
 import MiniLiveTranscription from '../../components/MiniLiveTranscription';
 import { DeepgramContextProvider } from '../context/DeepgramContextProvider';
 import { MicrophoneContextProvider } from '../context/MicrophoneContextProvider';
@@ -28,6 +28,7 @@ export default function CallerPage() {
   const [token, setToken] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const chatInterfaceRef = useRef<LiveKitChatInterfaceRef>(null);
   const [error, setError] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(false);
   const [callerType, setCallerType] = useState('investor');
@@ -328,6 +329,14 @@ export default function CallerPage() {
     }
   };
 
+  // Callback function to handle auto-transcription messages
+  const handleAutoTranscriptionMessage = (message: string) => {
+    console.log('Caller received auto-transcription message:', message);
+    if (chatInterfaceRef.current) {
+      chatInterfaceRef.current.addAutoMessage(message);
+    }
+  };
+
   const switchToTransferRoom = async (transferRoomName: string, callerToken: string, summary: string) => {
     try {
       setTransferMessage(`Transferring to specialist... ${summary}`);
@@ -560,6 +569,7 @@ export default function CallerPage() {
                 </div> */}
                 <div className="flex-1 min-h-0">
                   <LiveKitChatInterface 
+                    ref={chatInterfaceRef}
                     room={roomInstance}
                     localUserType="caller"
                     className="h-full"
@@ -571,7 +581,11 @@ export default function CallerPage() {
         </main>
         
         {/* Mini Live Transcription Component */}
-        <MiniLiveTranscription />
+        <MiniLiveTranscription 
+          room={roomInstance} 
+          autoSendWordCount={7} 
+          onMessageSent={handleAutoTranscriptionMessage}
+        />
       </div>
     </RoomContext.Provider>
       </MicrophoneContextProvider>

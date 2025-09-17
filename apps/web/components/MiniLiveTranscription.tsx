@@ -12,27 +12,70 @@ import {
   MicrophoneState,
   useMicrophone,
 } from "../app/context/MicrophoneContextProvider";
-import { Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX, MessageSquare, Send } from "lucide-react";
+import { Room } from "livekit-client";
 
 interface MiniLiveTranscriptionProps {
   className?: string;
+  room?: Room;
+  autoSendWordCount?: number; // Number of words to trigger auto-send
+  onMessageSent?: (message: string) => void; // Callback for when a message is sent
 }
 
-const MiniLiveTranscription = ({ className = "" }: MiniLiveTranscriptionProps) => {
+const MiniLiveTranscription = ({ 
+  className = "", 
+  room,
+  autoSendWordCount = 7,
+  onMessageSent 
+}: MiniLiveTranscriptionProps) => {
   const [caption, setCaption] = useState<string | undefined>("Click to start live transcription");
   const [isMinimized, setIsMinimized] = useState(false);
   const [isActive, setIsActive] = useState(false);
+  const [isAutoSendEnabled, setIsAutoSendEnabled] = useState(true);
+  const [accumulatedText, setAccumulatedText] = useState("");
+  const [messagesSent, setMessagesSent] = useState(0);
   
   const { connection, connectToDeepgram, connectionState, disconnectFromDeepgram } = useDeepgram();
   const { setupMicrophone, microphone, startMicrophone, stopMicrophone, microphoneState } = useMicrophone();
   const captionTimeout = useRef<any>(null);
   const keepAliveInterval = useRef<any>(null);
 
+  // Function to count words in a string
+  const countWords = (text: string): number => {
+    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+  };
+
+  // Function to send message to LiveKit chat
+  const sendToChat = async (text: string) => {
+    if (!room || !text.trim()) return;
+    
+    try {
+      console.log('MiniLiveTranscription sending to chat:', {
+        text: text.trim(),
+        localParticipantIdentity: room.localParticipant.identity,
+        roomState: room.state
+      });
+      
+      await room.localParticipant.sendText(text.trim(), { topic: 'chat' });
+      setMessagesSent(prev => prev + 1);
+      console.log("Auto-transcription message sent successfully:", text.trim());
+      
+      // Notify parent component that a message was sent
+      if (onMessageSent) {
+        onMessageSent(text.trim());
+      }
+    } catch (error) {
+      console.error("Failed to send auto-transcription message to chat:", error);
+    }
+  };
+
   const toggleTranscription = async () => {
     if (!isActive) {
       try {
         await setupMicrophone();
         setIsActive(true);
+        setAccumulatedText("");
+        setMessagesSent(0);
       } catch (error) {
         console.error("Failed to setup microphone:", error);
         setCaption("Microphone access denied");
@@ -42,6 +85,7 @@ const MiniLiveTranscription = ({ className = "" }: MiniLiveTranscriptionProps) =
       stopMicrophone();
       disconnectFromDeepgram();
       setCaption("Click to start live transcription");
+      setAccumulatedText("");
     }
   };
 
@@ -73,6 +117,22 @@ const MiniLiveTranscription = ({ className = "" }: MiniLiveTranscriptionProps) =
 
       if (thisCaption !== "") {
         setCaption(thisCaption);
+        
+        // Accumulate text for auto-sending
+        if (isFinal) {
+          setAccumulatedText(prev => {
+            const newText = prev + " " + thisCaption;
+            const wordCount = countWords(newText);
+            
+            // Auto-send when reaching word count threshold
+            if (isAutoSendEnabled && room && wordCount >= autoSendWordCount) {
+              sendToChat(newText.trim());
+              return ""; // Reset accumulated text after sending
+            }
+            
+            return newText.trim();
+          });
+        }
       }
 
       if (isFinal && speechFinal) {
@@ -97,7 +157,7 @@ const MiniLiveTranscription = ({ className = "" }: MiniLiveTranscriptionProps) =
       clearTimeout(captionTimeout.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectionState, isActive]);
+  }, [connectionState, isActive, isAutoSendEnabled, autoSendWordCount]);
 
   useEffect(() => {
     if (!connection || !isActive) return;
@@ -138,8 +198,26 @@ const MiniLiveTranscription = ({ className = "" }: MiniLiveTranscriptionProps) =
           <div className="flex items-center space-x-2">
             <div className={`w-2 h-2 rounded-full ${isActive && connectionState === LiveConnectionState.OPEN ? 'bg-green-500' : 'bg-gray-400'}`}></div>
             <span className="text-sm font-medium text-gray-700">Live Transcription</span>
+            {room && (
+              <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">
+                Auto-chat
+              </span>
+            )}
           </div>
           <div className="flex items-center space-x-1">
+            {room && (
+              <button
+                onClick={() => setIsAutoSendEnabled(!isAutoSendEnabled)}
+                className={`p-1.5 rounded transition-colors ${
+                  isAutoSendEnabled 
+                    ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                title={`Auto-send ${isAutoSendEnabled ? 'enabled' : 'disabled'}`}
+              >
+                <MessageSquare size={16} />
+              </button>
+            )}
             <button
               onClick={toggleTranscription}
               className={`p-1.5 rounded ${isActive ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'} transition-colors`}
@@ -160,14 +238,29 @@ const MiniLiveTranscription = ({ className = "" }: MiniLiveTranscriptionProps) =
           <p className="text-sm text-gray-700 leading-relaxed">
             {caption || "Click to start live transcription"}
           </p>
+          {accumulatedText && (
+            <div className="mt-2 pt-2 border-t border-gray-200">
+              <p className="text-xs text-gray-500">
+                Pending ({countWords(accumulatedText)}/{autoSendWordCount} words): 
+              </p>
+              <p className="text-xs text-gray-600 italic">"{accumulatedText}"</p>
+            </div>
+          )}
         </div>
 
         {/* Status */}
-        <div className="mt-2 text-xs text-gray-500">
-          {isActive ? (
-            connectionState === LiveConnectionState.OPEN ? "Connected" : "Connecting..."
-          ) : (
-            "Click microphone to start"
+        <div className="mt-2 flex justify-between items-center text-xs text-gray-500">
+          <span>
+            {isActive ? (
+              connectionState === LiveConnectionState.OPEN ? "Connected" : "Connecting..."
+            ) : (
+              "Click microphone to start"
+            )}
+          </span>
+          {room && messagesSent > 0 && (
+            <span className="bg-green-100 text-green-600 px-2 py-0.5 rounded">
+              {messagesSent} sent
+            </span>
           )}
         </div>
       </div>

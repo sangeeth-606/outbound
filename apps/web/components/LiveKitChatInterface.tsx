@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Send, MessageSquare } from 'lucide-react';
 import { Room, TextStreamReader } from 'livekit-client';
 
@@ -13,21 +13,58 @@ interface ChatMessage {
   isLocal: boolean;
 }
 
+export interface LiveKitChatInterfaceRef {
+  addAutoMessage: (message: string) => void;
+}
+
 interface LiveKitChatInterfaceProps {
   room: Room;
   localUserType: 'caller' | 'agent';
   className?: string;
+  onAutoMessage?: (message: string) => void;
 }
 
-export default function LiveKitChatInterface({ 
+const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInterfaceProps>(({ 
   room, 
   localUserType,
-  className = '' 
-}: LiveKitChatInterfaceProps) {
+  className = '',
+  onAutoMessage 
+}, ref) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    addAutoMessage: (messageText: string) => {
+      const autoMessage: ChatMessage = {
+        id: `${Date.now()}-${Math.random()}`,
+        content: messageText,
+        sender: 'You',
+        senderIdentity: room.localParticipant.identity,
+        timestamp: new Date(),
+        isLocal: true
+      };
+      
+      setMessages(prev => {
+        // Check if this message already exists to avoid duplicates
+        const messageExists = prev.some(msg => 
+          msg.content === autoMessage.content && 
+          msg.senderIdentity === autoMessage.senderIdentity &&
+          Math.abs(msg.timestamp.getTime() - autoMessage.timestamp.getTime()) < 2000 // 2 second window
+        );
+        
+        if (messageExists) {
+          console.log('Duplicate auto message detected, skipping:', autoMessage.content);
+          return prev;
+        }
+        
+        console.log('Adding auto-transcription message to chat display:', autoMessage);
+        return [...prev, autoMessage];
+      });
+    }
+  }), [room]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -62,16 +99,56 @@ export default function LiveKitChatInterface({
         const text = await reader.readAll();
         
         if (text.trim()) {
+          const isLocalMessage = participantInfo.identity === room.localParticipant.identity;
+          
+          console.log('Received text stream:', {
+            text: text.trim(),
+            senderIdentity: participantInfo.identity,
+            localIdentity: room.localParticipant.identity,
+            isLocal: isLocalMessage
+          });
+          
           const newMessage: ChatMessage = {
             id: `${Date.now()}-${Math.random()}`,
             content: text.trim(),
-            sender: participantInfo.identity || 'Unknown',
+            sender: isLocalMessage ? 'You' : participantInfo.identity || 'Unknown',
             senderIdentity: participantInfo.identity || 'Unknown',
             timestamp: new Date(),
-            isLocal: false
+            isLocal: isLocalMessage
           };
 
-          setMessages(prev => [...prev, newMessage]);
+          setMessages(prev => {
+            // Check if this message already exists to avoid duplicates
+            const messageExists = prev.some(msg => 
+              msg.content === newMessage.content && 
+              msg.senderIdentity === newMessage.senderIdentity &&
+              Math.abs(msg.timestamp.getTime() - newMessage.timestamp.getTime()) < 3000
+            );
+            
+            if (messageExists) {
+              console.log('Duplicate message detected, skipping:', newMessage.content);
+              return prev;
+            }
+            
+            // If it's a local message, don't add it again through text stream
+            // (it should have been added immediately when sent)
+            if (isLocalMessage) {
+              console.log('Local message received through text stream, checking if already displayed');
+              const localMessageExists = prev.some(msg => 
+                msg.content === newMessage.content && 
+                msg.isLocal === true &&
+                Math.abs(msg.timestamp.getTime() - newMessage.timestamp.getTime()) < 5000
+              );
+              
+              if (localMessageExists) {
+                console.log('Local message already displayed, skipping duplicate from text stream');
+                return prev;
+              }
+            }
+            
+            console.log('Adding new message to chat:', newMessage);
+            return [...prev, newMessage];
+          });
         }
       } catch (error) {
         console.error('Error reading text stream:', error);
@@ -97,21 +174,25 @@ export default function LiveKitChatInterface({
     const messageText = inputMessage.trim();
     
     try {
-      // Send message via LiveKit text stream
-      await room.localParticipant.sendText(messageText, { topic: 'chat' });
-
-      // Add to local messages immediately
+      console.log('Sending manual message:', messageText);
+      
+      // Immediately add the message to local state so sender can see it
       const localMessage: ChatMessage = {
         id: `${Date.now()}-${Math.random()}`,
         content: messageText,
         sender: 'You',
-        senderIdentity: room.localParticipant.identity || 'local',
+        senderIdentity: room.localParticipant.identity,
         timestamp: new Date(),
         isLocal: true
       };
-
+      
       setMessages(prev => [...prev, localMessage]);
+      console.log('Added local message to chat display:', localMessage);
+      
+      // Send message via LiveKit text stream
+      await room.localParticipant.sendText(messageText, { topic: 'chat' });
       setInputMessage('');
+      console.log('Manual message sent successfully');
     } catch (error) {
       console.error('Failed to send message:', error);
       alert('Failed to send message. Please try again.');
@@ -241,4 +322,8 @@ export default function LiveKitChatInterface({
       </div>
     </div>
   );
-}
+});
+
+LiveKitChatInterface.displayName = 'LiveKitChatInterface';
+
+export default LiveKitChatInterface;

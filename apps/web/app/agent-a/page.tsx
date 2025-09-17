@@ -10,12 +10,12 @@ import {
 } from '@livekit/components-react';
 import { Room, Track, RoomEvent } from 'livekit-client';
 import '@livekit/components-styles';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Phone, MessageSquare, Users, PhoneOff, User, CheckCircle, AlertTriangle, Clock, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ChatInterface from '../../components/ChatInterface';
 import TranscriptionDisplay from '../../components/TranscriptionDisplay';
-import LiveKitChatInterface from '../../components/LiveKitChatInterface';
+import LiveKitChatInterface, { LiveKitChatInterfaceRef } from '../../components/LiveKitChatInterface';
 import MiniLiveTranscription from '../../components/MiniLiveTranscription';
 import { DeepgramContextProvider } from '../context/DeepgramContextProvider';
 import { MicrophoneContextProvider } from '../context/MicrophoneContextProvider';
@@ -41,6 +41,7 @@ export default function AgentAPage() {
   const [nextCustomer, setNextCustomer] = useState<any>(null);
   const [isPickingCustomer, setIsPickingCustomer] = useState(false);
   const [isTranscriptionActive, setIsTranscriptionActive] = useState(false);
+  const chatInterfaceRef = useRef<LiveKitChatInterfaceRef>(null);
 
   // WebSocket for real-time notifications
   useEffect(() => {
@@ -508,6 +509,14 @@ export default function AgentAPage() {
     }
   };
 
+  // Callback function to handle auto-transcription messages
+  const handleAutoTranscriptionMessage = (message: string) => {
+    console.log('Agent received auto-transcription message:', message);
+    if (chatInterfaceRef.current) {
+      chatInterfaceRef.current.addAutoMessage(message);
+    }
+  };
+
   if (isConnecting) {
     return (
       <motion.div
@@ -663,6 +672,7 @@ export default function AgentAPage() {
                 </div> */}
                 <div className="flex-1 min-h-0">
                   <LiveKitChatInterface 
+                    ref={chatInterfaceRef}
                     room={roomInstance}
                     localUserType="agent"
                     className="h-full"
@@ -674,7 +684,11 @@ export default function AgentAPage() {
         </main>
         
         {/* Mini Live Transcription Component */}
-        <MiniLiveTranscription />
+        <MiniLiveTranscription 
+          room={roomInstance} 
+          autoSendWordCount={7} 
+          onMessageSent={handleAutoTranscriptionMessage}
+        />
       </div>
     </RoomContext.Provider>
       </MicrophoneContextProvider>
