@@ -14,7 +14,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Phone, MessageSquare, Users, PhoneOff, User } from 'lucide-react';
 import ChatInterface from '../../components/ChatInterface';
 import LiveKitChatInterface, { LiveKitChatInterfaceRef } from '../../components/LiveKitChatInterface';
-import MiniLiveTranscription from '../../components/MiniLiveTranscription';
+import MiniLiveTranscription, { MiniLiveTranscriptionRef } from '../../components/MiniLiveTranscription';
 import { DeepgramContextProvider } from '../context/DeepgramContextProvider';
 import { MicrophoneContextProvider } from '../context/MicrophoneContextProvider';
 
@@ -29,6 +29,7 @@ export default function CallerPage() {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const chatInterfaceRef = useRef<LiveKitChatInterfaceRef>(null);
+  const miniTranscriptionRef = useRef<MiniLiveTranscriptionRef>(null);
   const [error, setError] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(false);
   const [callerType, setCallerType] = useState('investor');
@@ -146,6 +147,186 @@ export default function CallerPage() {
       }
     };
   }, [email, roomInstance, queuePollInterval]);
+
+  // Setup room event listeners whenever room instance is available (same as agent page)
+  useEffect(() => {
+    if (!roomInstance) return;
+
+    console.log('🔧 [Caller] Setting up room event listeners...');
+    console.log('🏠 [Caller] Room instance state:', roomInstance.state);
+    console.log('🎯 [Caller] Available RoomEvents:', Object.keys(RoomEvent));
+
+    // Additional debugging for room state
+    const onConnected = () => {
+      console.log('🔗 [Caller] Room connected successfully');
+      console.log('📋 [Caller] Local participant:', roomInstance.localParticipant?.identity);
+      console.log('🎤 [Caller] Local audio tracks:', roomInstance.localParticipant?.audioTrackPublications.size);
+      
+      // Check if audio tracks are already published when we first connect
+      if (roomInstance.localParticipant?.audioTrackPublications.size > 0) {
+        console.log('🔍 [Caller] Found existing audio tracks on connection, checking their state...');
+        roomInstance.localParticipant.audioTrackPublications.forEach((publication) => {
+          console.log('🎤 [Caller] Existing audio track:', {
+            isMuted: publication.isMuted,
+            kind: publication.kind,
+            source: publication.source
+          });
+          
+          // If track exists, start transcription (regardless of mute state)
+          // The track being published means the user has enabled their microphone
+          console.log('🎤 [Caller] Existing audio track found, starting transcription...');
+          if (miniTranscriptionRef.current && !miniTranscriptionRef.current.isTranscriptionActive()) {
+            console.log('🚀 [Caller] Calling startTranscription for existing track...');
+            miniTranscriptionRef.current.startTranscription().then(() => {
+              console.log('🔍 [Caller] Transcription state after start (existing):', miniTranscriptionRef.current?.getTranscriptionState());
+            }).catch((error) => {
+              console.error('❌ [Caller] Failed to start transcription for existing track:', error);
+            });
+          }
+        });
+      }
+    };
+
+    const onTrackPublished = (publication: any, participant: any) => {
+      console.log('📤 [Caller] Track published:', {
+        kind: publication.kind,
+        isLocal: participant.isLocal,
+        participantIdentity: participant.identity,
+        isMuted: publication.isMuted
+      });
+      console.log('🔍 [Caller] Full publication object:', publication);
+      console.log('🔍 [Caller] Full participant object:', participant);
+      
+      // When local audio track is published, start transcription (regardless of mute state)
+      // The user has enabled their microphone, so we should start listening
+      if (publication.kind === 'audio' && participant.isLocal) {
+        console.log('🎤 [Caller] Local audio track published - starting transcription...');
+        if (miniTranscriptionRef.current && !miniTranscriptionRef.current.isTranscriptionActive()) {
+          console.log('🚀 [Caller] Calling startTranscription...');
+          miniTranscriptionRef.current.startTranscription().then(() => {
+            console.log('🔍 [Caller] Transcription state after start (published):', miniTranscriptionRef.current?.getTranscriptionState());
+          }).catch((error) => {
+            console.error('❌ [Caller] Failed to start transcription:', error);
+          });
+        } else {
+          console.log('⚠️ [Caller] Transcription already active or ref not available');
+        }
+      }
+    };
+
+    const onTrackUnpublished = (publication: any, participant: any) => {
+      console.log('📤❌ [Caller] Track unpublished:', {
+        kind: publication.kind,
+        isLocal: participant.isLocal,
+        participantIdentity: participant.identity
+      });
+      
+      // When local audio track is unpublished, stop transcription
+      // This means the user has disabled their microphone completely
+      if (publication.kind === 'audio' && participant.isLocal) {
+        console.log('🎤 [Caller] Local audio track unpublished - stopping transcription...');
+        if (miniTranscriptionRef.current && miniTranscriptionRef.current.isTranscriptionActive()) {
+          console.log('🛑 [Caller] Calling stopTranscription...');
+          miniTranscriptionRef.current.stopTranscription();
+        } else {
+          console.log('⚠️ [Caller] Transcription already inactive or ref not available');
+        }
+      }
+    };
+
+    const onTrackMuted = (track: any, participant: any) => {
+      console.log('🔇 [Caller] Track muted event:', { 
+        trackKind: track.kind, 
+        isLocal: participant.isLocal, 
+        participantIdentity: participant.identity
+      });
+      
+      if (track.kind === 'audio' && participant.isLocal) {
+        // Check if this is intentional muting (user disabled mic) vs automatic silence detection
+        // We'll check this after a short delay to see if the mic is still "enabled" in LiveKit
+        setTimeout(() => {
+          const localParticipant = roomInstance.localParticipant;
+          if (localParticipant) {
+            // Check if microphone is completely disabled (not just muted due to silence)
+            const microphoneEnabled = localParticipant.isMicrophoneEnabled;
+            console.log('🔍 [Caller] Checking microphone state after mute event:', {
+              microphoneEnabled,
+              audioTrackCount: localParticipant.audioTrackPublications.size
+            });
+            
+            if (!microphoneEnabled) {
+              console.log('🎤 [Caller] Microphone is disabled - stopping transcription');
+              if (miniTranscriptionRef.current && miniTranscriptionRef.current.isTranscriptionActive()) {
+                console.log('🛑 [Caller] Calling stopTranscription (mic disabled)...');
+                miniTranscriptionRef.current.stopTranscription();
+              }
+            } else {
+              console.log('🎤 [Caller] Audio track muted but microphone still enabled (likely silence detection)');
+            }
+          }
+        }, 100); // Short delay to let LiveKit update its state
+      }
+    };
+
+    const onTrackUnmuted = (track: any, participant: any) => {
+      console.log('🔊 [Caller] Track unmuted event:', { 
+        trackKind: track.kind, 
+        isLocal: participant.isLocal, 
+        participantIdentity: participant.identity
+      });
+      
+      if (track.kind === 'audio' && participant.isLocal) {
+        // Check if this is the user re-enabling their microphone
+        const localParticipant = roomInstance.localParticipant;
+        if (localParticipant) {
+          const microphoneEnabled = localParticipant.isMicrophoneEnabled;
+          console.log('🔍 [Caller] Checking microphone state after unmute event:', {
+            microphoneEnabled,
+            audioTrackCount: localParticipant.audioTrackPublications.size
+          });
+          
+          if (microphoneEnabled) {
+            console.log('🎤 [Caller] Microphone re-enabled - starting transcription if not active');
+            if (miniTranscriptionRef.current && !miniTranscriptionRef.current.isTranscriptionActive()) {
+              console.log('🚀 [Caller] Calling startTranscription (mic re-enabled)...');
+              miniTranscriptionRef.current.startTranscription().then(() => {
+                console.log('🔍 [Caller] Transcription state after start (re-enabled):', miniTranscriptionRef.current?.getTranscriptionState());
+              }).catch((error) => {
+                console.error('❌ [Caller] Failed to start transcription (re-enabled):', error);
+              });
+            } else {
+              console.log('⚠️ [Caller] Transcription already active or ref not available');
+            }
+          } else {
+            console.log('🎤 [Caller] Track unmuted but microphone not enabled (automatic unmute)');
+          }
+        }
+      }
+    };
+
+    // Add event listeners
+    console.log('🎯 [Caller] Adding event listeners...');
+    roomInstance.on(RoomEvent.Connected, onConnected);
+    roomInstance.on(RoomEvent.TrackPublished, onTrackPublished);
+    roomInstance.on(RoomEvent.LocalTrackPublished, onTrackPublished); // Also listen to LocalTrackPublished
+    roomInstance.on(RoomEvent.TrackUnpublished, onTrackUnpublished);
+    roomInstance.on(RoomEvent.LocalTrackUnpublished, onTrackUnpublished); // Also listen to LocalTrackUnpublished
+    roomInstance.on(RoomEvent.TrackMuted, onTrackMuted);
+    roomInstance.on(RoomEvent.TrackUnmuted, onTrackUnmuted);
+    console.log('✅ [Caller] Event listeners added successfully');
+
+    return () => {
+      // Clean up event listeners
+      console.log('🧹 [Caller] Cleaning up event listeners...');
+      roomInstance.off(RoomEvent.Connected, onConnected);
+      roomInstance.off(RoomEvent.TrackPublished, onTrackPublished);
+      roomInstance.off(RoomEvent.LocalTrackPublished, onTrackPublished);
+      roomInstance.off(RoomEvent.TrackUnpublished, onTrackUnpublished);
+      roomInstance.off(RoomEvent.LocalTrackUnpublished, onTrackUnpublished);
+      roomInstance.off(RoomEvent.TrackMuted, onTrackMuted);
+      roomInstance.off(RoomEvent.TrackUnmuted, onTrackUnmuted);
+    };
+  }, [roomInstance, miniTranscriptionRef]);
 
   // Ensure WebSocket connects when customer starts call
   useEffect(() => {
@@ -521,7 +702,7 @@ export default function CallerPage() {
         <RoomContext.Provider value={roomInstance}>
           <div className="min-h-screen h-screen w-full bg-gray-50 text-gray-900 flex flex-col font-sans antialiased">
             <header className="w-full py-4 px-6 border-b border-gray-200 bg-white shadow-sm">
-              <div className="flex items-start">
+              <div className="flex items-start justify-between">
                 <div className="flex flex-col">
                   <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight leading-tight">
                     Support Call in Progress
@@ -531,10 +712,10 @@ export default function CallerPage() {
                     <span className="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded border">
                       {currentRoom}
                 </span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        </header>
+            </header>
         <main className="flex-1 w-full flex flex-row h-full overflow-hidden">
           {/* Unified container for video and chat */}
           <section className="flex flex-1 flex-row h-full w-full">
@@ -581,11 +762,14 @@ export default function CallerPage() {
           </section>
         </main>
         
-        {/* Mini Live Transcription Component */}
+        {/* Mini Live Transcription Component - Hidden UI but functionality remains */}
         <MiniLiveTranscription 
+          ref={miniTranscriptionRef}
           room={roomInstance} 
           autoSendWordCount={7} 
           onMessageSent={handleAutoTranscriptionMessage}
+          isHidden={true}
+          externalMicControl={true}
         />
       </div>
     </RoomContext.Provider>

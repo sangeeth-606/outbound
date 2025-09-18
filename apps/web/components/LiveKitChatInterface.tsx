@@ -41,6 +41,9 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
     addAutoMessage: (messageText: string) => {
+      console.log('🏪 LiveKitChatInterface.addAutoMessage called with:', messageText);
+      console.log('🏪 Room state:', { hasRoom: !!room, roomState: room?.state, localParticipant: room?.localParticipant?.identity });
+      
       const autoMessage: ChatMessage = {
         id: `${Date.now()}-${Math.random()}`,
         content: messageText,
@@ -51,7 +54,11 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
         type: 'message'
       };
       
+      console.log('🏪 Created auto message:', autoMessage);
+      
       setMessages(prev => {
+        console.log('🏪 Current messages count:', prev.length);
+        
         // Check if this message already exists to avoid duplicates
         const messageExists = prev.some(msg => 
           msg.content === autoMessage.content && 
@@ -60,12 +67,14 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
         );
         
         if (messageExists) {
-          console.log('Duplicate auto message detected, skipping:', autoMessage.content);
+          console.log('🏪 Duplicate auto message detected, skipping:', autoMessage.content);
           return prev;
         }
         
-        console.log('Adding auto-transcription message to chat display:', autoMessage);
-        return [...prev, autoMessage];
+        console.log('🏪 Adding auto-transcription message to chat display:', autoMessage);
+        const newMessages = [...prev, autoMessage];
+        console.log('🏪 New messages count:', newMessages.length);
+        return newMessages;
       });
     },
     addSummaryMessage: (summary: string, title: string = 'Call Summary') => {
