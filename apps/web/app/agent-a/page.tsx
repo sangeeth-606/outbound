@@ -586,49 +586,140 @@ export default function AgentAPage() {
 
   const initiateTwilioTransfer = async () => {
     try {
-      // Generate AI summary first
+      setTransferStatus('initiating');
+      
+      // Get current room and participant info first
+      const currentRoom = roomInstance?.name || 'unknown_room';
+      const agentIdentity = roomInstance?.localParticipant?.identity || 'agent_a';
+      const callerIdentity = nextCustomer?.email || 'caller';
+      
+      // Collect chat history from current session (same logic as normal transfer)
+      let conversationContext = "Customer needs assistance with login and dashboard access issues.";
+      
+      if (chatInterfaceRef.current) {
+        const chatHistory = chatInterfaceRef.current.getChatHistory();
+        
+        if (chatHistory.length > 0) {
+          console.log('📞 Collected chat history for phone transfer:', chatHistory);
+          
+          // Convert chat history to conversation text
+          const chatConversationText = chatHistory
+            .map(msg => `${msg.sender}: ${msg.content}`)
+            .join('\n');
+          
+          // Send chat history to backend for AI summarization
+          try {
+            const chatResponse = await fetch('/api/chat/history', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                room_name: currentRoom,
+                messages: chatHistory
+              }),
+            });
+
+            const chatData = await chatResponse.json();
+            if (chatData.success && chatData.summary) {
+              conversationContext = chatData.summary; // Use the LLM-generated summary
+              console.log('📞 Generated phone transfer chat summary from LLM:', conversationContext);
+            } else {
+              // Fallback to conversation text if LLM summary failed
+              conversationContext = chatConversationText;
+              console.log('📞 Using raw chat conversation as fallback for phone transfer:', conversationContext);
+            }
+          } catch (error) {
+            console.error('❌ Failed to get chat summary for phone transfer, using raw text:', error);
+            conversationContext = chatConversationText;
+          }
+        } else {
+          console.log('📞 No chat history available for phone transfer, using default context');
+        }
+      } else {
+        console.log('📞 Chat interface not available for phone transfer, using default context');
+      }
+      
+      // Generate AI summary for phone transfer
       const summaryResponse = await fetch('/api/generate-summary', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          conversation_context: "Customer called about login issues. I verified their account is active and helped reset their password. They can now log in but can't see their dashboard. They need immediate access to their financial data for a meeting this afternoon. Customer seems frustrated but cooperative.",
-          caller_type: "investor",
+          conversation_context: conversationContext,
+          caller_type: "customer",
           caller_info: {
-            name: "John Doe",
-            email: "john.doe@example.com",
-            portfolio: "$50,000 across 3 companies"
+            name: nextCustomer?.email || "Unknown Customer",
+            email: nextCustomer?.email || "unknown@example.com",
+            room: currentRoom
           }
         }),
       });
 
       const summaryData = await summaryResponse.json();
-      const summary = summaryData.success ? summaryData.summary : "Customer needs assistance with login and dashboard access issues.";
+      const summary = summaryData.success ? summaryData.summary : "Customer needs assistance - phone transfer initiated.";
 
-      // Initiate Twilio call
+      console.log('📞 Phone transfer details:', {
+        currentRoom,
+        agentIdentity,
+        callerIdentity,
+        conversationContext: conversationContext.substring(0, 100) + '...',
+        summary: summary.substring(0, 100) + '...'
+      });
+
+      // Initiate enhanced Twilio transfer
       const twilioResponse = await fetch('/api/twilio-transfer', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          target_phone: "+917306161621", // Your Twilio target phone
-          room_name: "twilio_transfer_room",
-          summary: summary
+          target_phone: "+917306161621", // Your target phone number
+          room_name: currentRoom,
+          summary: summary,
+          agent_a_id: agentIdentity,
+          caller_id: callerIdentity,
+          method: "enhanced" // Use enhanced LiveKit integration
         }),
       });
 
       const twilioData = await twilioResponse.json();
 
       if (twilioData.success) {
-        alert(`📞 Twilio Transfer Initiated!\n\n📋 AI-Generated Summary:\n${summary}\n\n🔄 Call SID: ${twilioData.call_sid}\n\n📞 Phone call initiated to ${twilioData.target_phone || "+917306161621"}\n\nAgent A should now explain the context to the phone agent.`);
+        setTransferStatus('in_progress');
+        
+        if (twilioData.method === "enhanced") {
+          // Enhanced transfer with room movement
+          alert(`📞 Enhanced Phone Transfer Initiated!\n\n📋 AI-Generated Summary:\n${summary}\n\n🔄 Call SID: ${twilioData.call_sid}\n📞 Phone call initiated to ${twilioData.phone_number}\n🏠 Transfer Room: ${twilioData.transfer_room_name}\n\n✨ You and the caller have been moved to the new transfer room.\n\n🎯 When the phone agent answers, they will automatically join the room for a three-way conversation.`);
+          
+          // Room movement handled by backend, frontend should reconnect to new room
+          if (twilioData.moved_participants) {
+            const agentParticipant = twilioData.moved_participants.find((p: any) => p.identity === agentIdentity);
+            if (agentParticipant) {
+              console.log("🔄 Agent should reconnect to:", agentParticipant.target_room);
+              console.log("🎫 New token:", agentParticipant.new_token);
+              // Here you could implement automatic room switching if desired
+            }
+          }
+        } else {
+          // Basic transfer
+          alert(`📞 Phone Transfer Initiated!\n\n📋 AI-Generated Summary:\n${summary}\n\n🔄 Call SID: ${twilioData.call_sid}\n📞 Phone call initiated to ${twilioData.phone_number}\n\nPhone agent will receive call with summary and can join via web or phone.`);
+        }
+        
+        // Keep transfer status for a while then reset
+        setTimeout(() => {
+          setTransferStatus('idle');
+        }, 10000);
+        
       } else {
-        alert(`Twilio transfer failed: ${twilioData.message}\n\nUsing fallback summary:\n${summary}`);
+        setTransferStatus('idle');
+        alert(`❌ Phone Transfer Failed!\n\nError: ${twilioData.message || 'Unknown error'}\n\n📋 Generated Summary:\n${summary}\n\nPlease try again or use the regular transfer button.`);
       }
     } catch (error) {
       console.error('Twilio transfer failed:', error);
-      alert('Twilio transfer failed. Please try again.');
+      setTransferStatus('idle');
+      alert('❌ Phone transfer failed. Please check your connection and try again.');
     }
   };
 
@@ -846,6 +937,18 @@ export default function AgentAPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     {transferStatus === 'idle' ? 'Transfer Call' : 'Transferring...'}
+                  </button>
+                  
+                  <button
+                    onClick={initiateTwilioTransfer}
+                    disabled={transferStatus !== 'idle' || !nextCustomer}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+                    title="Transfer call to external phone number via Twilio"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                    Call Transfer
                   </button>
                 </div>
               </div>

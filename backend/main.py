@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 import uvicorn
 from typing import Optional
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 from livekit_utils import create_room_token, create_room, disconnect_participant, get_room_participants, delete_room, start_room_transcription, stop_room_transcription, is_room_transcription_active
 from twilio_utils import initiate_twilio_call, initiate_warm_transfer_call, get_call_status, handle_call_status_callback, generate_twiml_response
+from twilio.twiml.voice_response import VoiceResponse
 from llm_utils import generate_call_summary
 from db_utils import (
     get_caller_context, get_agent_by_role,
@@ -397,8 +399,24 @@ async def initiate_transfer(request: TransferInitiateRequest):
 @app.post("/api/twilio/voice")
 async def twilio_voice_webhook(room_name: str, summary: str = None):
     """Twilio webhook endpoint - returns TwiML to connect call to LiveKit room"""
-    twiml_response = generate_twiml_response(room_name, summary)
-    return {"twiml": twiml_response}
+    try:
+        logger.info(f"📞 Twilio voice webhook called for room: {room_name}")
+        if summary:
+            logger.info(f"📋 Summary to speak: {summary[:100]}...")
+        
+        twiml_response = generate_twiml_response(room_name, summary)
+        logger.info(f"📞 Generated TwiML: {twiml_response}")
+        
+        # Return TwiML as plain text with correct content type
+        return Response(content=twiml_response, media_type="text/xml")
+        
+    except Exception as e:
+        logger.error(f"❌ TwiML generation failed: {e}")
+        # Return error TwiML
+        error_response = VoiceResponse()
+        error_response.say("We are sorry, an application error has occurred. Goodbye.")
+        error_response.hangup()
+        return Response(content=str(error_response), media_type="text/xml")
 
 @app.post("/api/twilio/status")
 async def twilio_status_callback(request: dict):
@@ -877,52 +895,94 @@ async def clear_agent_transfer_status(agent_id: str):
 
 @app.post("/api/twilio/transfer")
 async def twilio_transfer_endpoint(request: dict):
-    """Initiate Twilio phone call for warm transfer with status tracking"""
+    """Enhanced Twilio phone call for warm transfer with LiveKit room integration"""
     try:
         target_phone = request.get("target_phone", os.getenv("TWILIO_TARGET_PHONE"))
         room_name = request.get("room_name", "transfer_room")
         summary = request.get("summary", "Customer needs assistance")
-        agent_a_id = request.get("agent_a_id")
+        agent_a_id = request.get("agent_a_id", "agent_a")
+        caller_id = request.get("caller_id", "caller")
+        transfer_method = request.get("method", "enhanced")  # "enhanced" or "basic"
 
         if not target_phone:
             raise ValueError("Target phone number is required")
 
-        # Initiate warm transfer call with summary
-        twilio_call_sid = await initiate_warm_transfer_call(target_phone, room_name, summary)
+        logger.info(f"📞 Initiating {transfer_method} phone transfer to {target_phone}")
 
-        # Get initial call status
-        call_details = await get_call_status(twilio_call_sid)
+        if transfer_method == "enhanced":
+            # Use enhanced LiveKit room integration
+            result = await initiate_enhanced_phone_transfer(
+                phone_number=target_phone,
+                current_room_name=room_name,
+                caller_identity=caller_id,
+                agent_a_identity=agent_a_id,
+                summary=summary
+            )
+            
+            if result["success"]:
+                # Broadcast enhanced transfer notification
+                notification = {
+                    "type": "enhanced_phone_transfer_initiated",
+                    "transfer_room_name": result["transfer_room_name"],
+                    "call_sid": result["call_sid"],
+                    "phone_number": target_phone,
+                    "method": "enhanced",
+                    "moved_participants": result.get("moved_participants", []),
+                    "status": result["status"]
+                }
+                await broadcast_websocket_message(notification)
+                
+                return {
+                    "success": True,
+                    "method": "enhanced",
+                    "message": f"Enhanced transfer initiated to {target_phone}",
+                    **result
+                }
+            else:
+                # Fallback to basic method
+                logger.warning("Enhanced transfer failed, falling back to basic method")
+                transfer_method = "basic"
 
-        # Broadcast transfer initiation
-        notification = {
-            "type": "twilio_transfer_initiated",
-            "call_sid": twilio_call_sid,
-            "target_phone": target_phone,
-            "room_name": room_name,
-            "agent_a_id": agent_a_id,
-            "status": call_details.get("status")
-        }
-        await broadcast_websocket_message(notification)
+        if transfer_method == "basic":
+            # Use basic Twilio calling
+            twilio_call_sid = await initiate_warm_transfer_call(target_phone, room_name, summary)
+            call_details = await get_call_status(twilio_call_sid)
 
-        return {
-            "success": True,
-            "call_sid": twilio_call_sid,
-            "message": f"Warm transfer call initiated to {target_phone}",
-            "room_name": room_name,
-            "summary": summary,
-            "call_details": call_details
-        }
+            # Broadcast basic transfer notification
+            notification = {
+                "type": "twilio_transfer_initiated",
+                "call_sid": twilio_call_sid,
+                "target_phone": target_phone,
+                "room_name": room_name,
+                "agent_a_id": agent_a_id,
+                "method": "basic",
+                "status": call_details.get("status")
+            }
+            await broadcast_websocket_message(notification)
+
+            return {
+                "success": True,
+                "method": "basic",
+                "call_sid": twilio_call_sid,
+                "message": f"Basic warm transfer call initiated to {target_phone}",
+                "room_name": room_name,
+                "summary": summary,
+                "call_details": call_details
+            }
+
     except ValueError as e:
+        logger.error(f"Transfer validation error: {e}")
         return {
             "success": False,
             "error": str(e),
             "message": "Invalid request parameters"
         }
     except Exception as e:
+        logger.error(f"Transfer error: {e}")
         return {
             "success": False,
             "error": str(e),
-            "message": "Failed to initiate Twilio call"
+            "message": "Failed to initiate phone transfer"
         }
 
 @app.get("/api/twilio/call/{call_sid}")
@@ -1119,5 +1179,70 @@ async def notify_agent_transfer(request: dict):
             "error": str(e)
         }
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+from livekit_sip_utils import initiate_enhanced_phone_transfer, enhanced_twilio_manager
+
+@app.get("/api/room/{room_name}/participants")
+async def get_room_participants_endpoint(room_name: str):
+    """Get current participants in a LiveKit room"""
+    try:
+        result = await enhanced_twilio_manager.get_room_participants(room_name)
+        return result
+    except Exception as e:
+        logger.error(f"Failed to get room participants: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "participants": []
+        }
+
+@app.post("/api/room/move-participants")
+async def move_participants_endpoint(request: dict):
+    """Move participants between LiveKit rooms"""
+    try:
+        source_room = request.get("source_room")
+        target_room = request.get("target_room") 
+        participant_identities = request.get("participant_identities", [])
+        
+        if not all([source_room, target_room, participant_identities]):
+            raise ValueError("source_room, target_room, and participant_identities are required")
+            
+        result = await enhanced_twilio_manager.move_participants_to_transfer_room(
+            source_room=source_room,
+            target_room=target_room,
+            participant_identities=participant_identities
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Failed to move participants: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.post("/api/twilio/voice-gather")
+async def twilio_voice_gather(room_name: str, Digits: str = None):
+    """Handle user input from Twilio voice gather"""
+    try:
+        logger.info(f"📞 Voice gather for room {room_name}, digits: {Digits}")
+        
+        response = VoiceResponse()
+        
+        if Digits == "1":
+            # User wants to stay on the line
+            response.say("Thank you for staying on the line. You are now connected to the support team.", voice='alice')
+            response.play("http://com.twilio.music.classical.s3.amazonaws.com/BusyStrings.wav", loop=0)
+        else:
+            # Default response
+            response.say("Thank you. Please join the video call via web browser for the best experience.", voice='alice')
+            response.hangup()
+        
+        return Response(content=str(response), media_type="text/xml")
+        
+    except Exception as e:
+        logger.error(f"❌ Voice gather failed: {e}")
+        error_response = VoiceResponse()
+        error_response.say("Thank you for calling. Goodbye.")
+        error_response.hangup()
+        return Response(content=str(error_response), media_type="text/xml")

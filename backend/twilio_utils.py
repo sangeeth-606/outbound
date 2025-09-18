@@ -4,35 +4,47 @@ from twilio.rest import Client
 from twilio.twiml.voice_response import VoiceResponse
 from twilio.base.exceptions import TwilioException
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Twilio configuration
-TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
-TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER")
-WEBHOOK_BASE_URL = os.getenv("WEBHOOK_BASE_URL", "https://yourdomain.com")
+def get_twilio_credentials():
+    """Get Twilio credentials, loading from environment"""
+    load_dotenv()  # Ensure .env is loaded
+    return {
+        "account_sid": os.getenv("TWILIO_ACCOUNT_SID"),
+        "auth_token": os.getenv("TWILIO_AUTH_TOKEN"),
+        "phone_number": os.getenv("TWILIO_PHONE_NUMBER"),
+        "webhook_base_url": os.getenv("WEBHOOK_BASE_URL", "https://yourdomain.com")
+    }
 
 def get_twilio_client() -> Client:
     """Get authenticated Twilio client"""
-    if not TWILIO_ACCOUNT_SID or not TWILIO_AUTH_TOKEN:
+    creds = get_twilio_credentials()
+    if not creds["account_sid"] or not creds["auth_token"]:
         raise ValueError("Twilio credentials must be set in environment variables")
     
-    return Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+    return Client(creds["account_sid"], creds["auth_token"])
 
 async def initiate_twilio_call(phone_number: str, room_name: str, summary: str = None) -> str:
     """Initiate an outbound Twilio call and connect it to a LiveKit room"""
     try:
+        # Get fresh credentials
+        creds = get_twilio_credentials()
+        
         # Validate phone number
-        if not validate_phone_number(phone_number):
+        if not await validate_phone_number(phone_number):
             raise ValueError(f"Invalid phone number format: {phone_number}")
 
         client = get_twilio_client()
 
         # Webhook URL for Twilio to call when the call is answered
-        webhook_url = f"{WEBHOOK_BASE_URL}/api/twilio/voice?room_name={room_name}"
+        webhook_url = f"{creds['webhook_base_url']}/api/twilio/voice?room_name={room_name}"
         if summary:
             import urllib.parse
             webhook_url += f"&summary={urllib.parse.quote(summary)}"
@@ -40,10 +52,10 @@ async def initiate_twilio_call(phone_number: str, room_name: str, summary: str =
         # Make the outbound call
         call = client.calls.create(
             to=phone_number,
-            from_=TWILIO_PHONE_NUMBER,
+            from_=creds["phone_number"],
             url=webhook_url,
             method='POST',
-            status_callback=f"{WEBHOOK_BASE_URL}/api/twilio/status",
+            status_callback=f"{creds['webhook_base_url']}/api/twilio/status",
             status_callback_method='POST'
         )
 
@@ -64,9 +76,42 @@ def generate_twiml_response(room_name: str, summary: str = None) -> str:
     if summary:
         # Speak the summary before connecting
         response.say(summary, voice='alice')
+        # Add a brief pause
+        response.pause(length=1)
 
-    response.connect().room(room_name)
-
+    # Try to get LiveKit SIP configuration
+    livekit_sip_endpoint = os.getenv("LIVEKIT_SIP_ENDPOINT")
+    
+    if livekit_sip_endpoint:
+        # If LiveKit SIP is configured, connect to the room via SIP
+        response.say("Connecting you to the support team via secure video call.", voice='alice')
+        # Connect to LiveKit room via SIP
+        dial = response.dial()
+        dial.sip(f"sip:{room_name}@{livekit_sip_endpoint}")
+    else:
+        # Fallback: provide instructions and generate a web URL for manual connection
+        response.say("Please visit the provided web link to join the video call with the support team.", voice='alice')
+        
+        # For basic integration without LiveKit SIP, we can:
+        # 1. Generate a token for the phone user
+        # 2. Provide instructions to join via web
+        # 3. Keep the call active for manual connection
+        
+        web_url = f"https://your-app-domain.com/join?room={room_name}&identity=phone_agent"
+        response.say(f"Your room name is {room_name}. Visit {web_url} to join the call.", voice='alice')
+        
+        # Offer to stay on the line
+        gather = response.gather(
+            action=f'/api/twilio/voice-gather?room={room_name}',
+            method='POST',
+            timeout=30,
+            num_digits=1
+        )
+        gather.say("Press 1 to stay on the line, or hang up to join via web.", voice='alice')
+        
+        # If no input, provide final instructions
+        response.say("Thank you. Please join the video call via the web link provided.", voice='alice')
+    
     return str(response)
 
 async def get_call_status(call_sid: str) -> dict:
@@ -80,8 +125,8 @@ async def get_call_status(call_sid: str) -> dict:
             "duration": call.duration,
             "start_time": call.start_time,
             "end_time": call.end_time,
-            "from_number": call.from_,
-            "to_number": call.to
+            "from_number": call.from_formatted,
+            "to_number": call.to_formatted
         }
     except TwilioException as e:
         logger.error(f"Twilio API error getting call status for {call_sid}: {str(e)}")

@@ -1,6 +1,7 @@
 import os
 import asyncio
 import uuid
+import aiohttp
 from typing import Dict, Optional, Callable
 from livekit import api
 from livekit.api import AccessToken, VideoGrants
@@ -66,8 +67,10 @@ async def disconnect_participant(room_name: str, participant_identity: str) -> b
         api_key = os.getenv("LIVEKIT_API_KEY")
         api_secret = os.getenv("LIVEKIT_API_SECRET")
 
-        client = RoomService(livekit_url, api_key, api_secret)
+        session = aiohttp.ClientSession()
+        client = RoomService(session=session, url=livekit_url, api_key=api_key, api_secret=api_secret)
         await client.remove_participant(room_name, participant_identity)
+        await session.close()
         logger.info(f"Disconnected participant {participant_identity} from room {room_name}")
         return True
     except Exception as e:
@@ -81,8 +84,10 @@ async def get_room_participants(room_name: str) -> list:
         api_key = os.getenv("LIVEKIT_API_KEY")
         api_secret = os.getenv("LIVEKIT_API_SECRET")
 
-        client = RoomService(livekit_url, api_key, api_secret)
+        session = aiohttp.ClientSession()
+        client = RoomService(session=session, url=livekit_url, api_key=api_key, api_secret=api_secret)
         participants = await client.list_participants(room_name)
+        await session.close()
         return [p.identity for p in participants]
     except Exception as e:
         logger.error(f"Failed to get participants for room {room_name}: {str(e)}")
@@ -95,8 +100,10 @@ async def delete_room(room_name: str) -> bool:
         api_key = os.getenv("LIVEKIT_API_KEY")
         api_secret = os.getenv("LIVEKIT_API_SECRET")
 
-        client = RoomService(livekit_url, api_key, api_secret)
+        session = aiohttp.ClientSession()
+        client = RoomService(session=session, url=livekit_url, api_key=api_key, api_secret=api_secret)
         await client.delete_room(room_name)
+        await session.close()
         logger.info(f"Deleted room {room_name}")
         return True
     except Exception as e:
