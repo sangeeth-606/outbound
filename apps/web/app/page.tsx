@@ -66,9 +66,11 @@ export default function Home() {
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <div className="flex items-center">
-              <div className="w-8 h-8 bg-red-500 rounded flex items-center justify-center mr-3">
-                <span className="text-white text-sm font-bold">AC</span>
-              </div>
+              <img
+                src="https://attack.capital/images/logo.png"
+                alt="Attack Capital logo"
+                className="w-8 h-8 mr-3 object-contain"
+              />
               <span className="text-xl font-semibold text-gray-900">Attack.Capital</span>
             </div>
 
@@ -86,9 +88,9 @@ export default function Home() {
               <Link href="/support" className="text-gray-700 hover:text-gray-900 font-medium">
                 TEAM
               </Link>
-              <Link href="/live-transcribe" className="text-gray-700 hover:text-gray-900 font-medium">
+              {/* <Link href="/live-transcribe" className="text-gray-700 hover:text-gray-900 font-medium">
                 LIVE TRANSCRIBE
-              </Link>
+              </Link> */}
             </nav>
 
             {/* CTA Buttons */}
@@ -229,7 +231,7 @@ export default function Home() {
           {/* First Testimonial */}
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-left">
             <img
-              src="/smiling-man-glasses-headshot.png"
+              src="https://attack.capital/images/investors/cory-hill.jpg"
               alt="Cory Hill"
               className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
             />
@@ -249,7 +251,7 @@ export default function Home() {
           {/* Second Testimonial */}
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-left">
             <img
-              src="/professional-headshot-of-smiling-man-in-white-shir.jpg"
+              src="https://attack.capital/images/investors/varun-villait.jpg"
               alt="Varun Villait"
               className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
             />
@@ -289,9 +291,11 @@ export default function Home() {
             {/* Y Combinator */}
             <div className="text-center">
               <div className="mb-6">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-500 rounded-lg mb-4">
-                  <span className="text-white text-2xl font-bold">Y</span>
-                </div>
+                <img
+                  src="https://attack.capital/images/products/y-combinator.png"
+                  alt="Y Combinator logo"
+                  className="w-16 h-16 mb-4 object-contain"
+                />
                 <div className="text-orange-500 font-semibold text-lg">Combinator</div>
               </div>
               <p className="text-gray-600 text-sm leading-relaxed">The #1 startup investor by unicorns funded</p>
@@ -300,10 +304,11 @@ export default function Home() {
             {/* Slow Ventures */}
             <div className="text-center">
               <div className="mb-6">
-                <div className="mb-4">
-                  <div className="text-2xl font-bold text-gray-900">SLOW</div>
-                  <div className="text-sm font-medium text-gray-600 tracking-wider">VENTURES</div>
-                </div>
+                <img
+                  src="https://attack.capital/images/products/slow-ventures.png"
+                  alt="Slow Ventures logo"
+                  className="w-16 h-16 mb-4 object-contain"
+                />
               </div>
               <p className="text-gray-600 text-sm leading-relaxed">
                 Valley based fund led by past executives of Facebook.com
@@ -313,7 +318,11 @@ export default function Home() {
             {/* GFC */}
             <div className="text-center">
               <div className="mb-6">
-                <div className="text-4xl font-bold text-gray-900 mb-4">GFC</div>
+                <img
+                  src="https://attack.capital/images/products/gfc.png"
+                  alt="GFC logo"
+                  className="w-16 h-16 mb-4 object-contain"
+                />
               </div>
               <p className="text-gray-600 text-sm leading-relaxed">
                 Germany based fund led by the billionaire Oliver Samwer.
@@ -323,11 +332,11 @@ export default function Home() {
             {/* Soma Capital */}
             <div className="text-center">
               <div className="mb-6">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-600 rounded-lg mb-4">
-                  <span className="text-white text-2xl">👑</span>
-                </div>
-                <div className="text-purple-600 font-semibold text-lg">SOMA</div>
-                <div className="text-purple-600 text-sm font-medium">CAPITAL</div>
+                <img
+                  src="https://attack.capital/images/products/soma-capital.png"
+                  alt="Soma Capital logo"
+                  className="w-16 h-16 mb-4 object-contain"
+                />
               </div>
               <p className="text-gray-600 text-sm leading-relaxed">Fund led by the owners of Sacramento Kings.</p>
             </div>
