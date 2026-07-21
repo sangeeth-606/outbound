@@ -185,6 +185,22 @@
   }
 }
 
+@keyframes marquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.marquee-track {
+  mask-image: linear-gradient(90deg, transparent 0%, #000 5%, #000 95%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 5%, #000 95%, transparent 100%);
+}
+
+.marquee-content {
+  display: inline-block;
+  animation: marquee 25s linear infinite;
+  padding-right: 60px;
+}
+
 .lk-participant-tile .lk-participant-name,
 .lk-participant-tile .lk-participant-metadata,
 [data-lk-theme] .lk-participant-name,

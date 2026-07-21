@@ -12,6 +12,8 @@ const pageTitles: Record<string, string> = {
   '/live-transcribe': 'Live Monitor',
 };
 
+const marqueeText = '⚠  SITE UNDER MAINTENANCE  ·  WORK IN PROGRESS  ·  CONTACT SUPPORT@ZAPE.WORK  ⚠';
+
 export function Header() {
   const pathname = usePathname();
   const [connected, setConnected] = useState(false);
@@ -31,41 +33,41 @@ export function Header() {
   const title = pageTitles[pathname] || 'Dashboard';
 
   return (
-    <header className="h-14 flex-shrink-0 bg-surface-secondary border-b border-border-separator flex items-center justify-between px-6">
-      <div className="flex items-center gap-3">
-        <h1 className="text-sm font-bold tracking-wide text-text-main uppercase">
-          {title}
-        </h1>
-        <span className="text-[10px] text-text-label bg-surface-primary px-2 py-0.5 rounded-sm border border-border-dim">
-          {pathname}
-        </span>
+    <div className="flex-shrink-0">
+      <div className="h-6 bg-surface-card border-b border-border-separator overflow-hidden relative flex items-center">
+        <div className="marquee-track absolute inset-0 flex items-center">
+          <span className="text-[10px] text-accent-warning tracking-widest uppercase whitespace-nowrap marquee-content">
+            {marqueeText}
+          </span>
+        </div>
       </div>
-
-      <div className="flex items-center gap-4">
-        <a
-          href="mailto:support@zape.work"
-          className="text-[10px] text-accent-warning bg-accent-warning/10 px-2.5 py-1 rounded-sm border border-accent-warning/20 tracking-wider uppercase hover:bg-accent-warning/20 transition-colors"
-        >
-          ⚡ Pre-release — contact support@zape.work
-        </a>
+      <header className="h-12 bg-surface-secondary border-b border-border-separator flex items-center justify-between px-6">
+        <div className="flex items-center gap-3">
+          <h1 className="text-sm font-bold tracking-wide text-text-main uppercase">
+            {title}
+          </h1>
+          <span className="text-[10px] text-text-label bg-surface-primary px-2 py-0.5 rounded-sm border border-border-dim">
+            {pathname}
+          </span>
+        </div>
 
         <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 text-xs">
-          {connected ? (
-            <>
-              <Wifi className="w-3.5 h-3.5 text-accent-success" />
-              <span className="text-accent-success">Connected</span>
-            </>
-          ) : (
-            <>
-              <WifiOff className="w-3.5 h-3.5 text-text-label" />
-              <span className="text-text-label">Disconnected</span>
-            </>
-          )}
+          <div className="flex items-center gap-2 text-xs">
+            {connected ? (
+              <>
+                <Wifi className="w-3.5 h-3.5 text-accent-success" />
+                <span className="text-accent-success">Connected</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-3.5 h-3.5 text-text-label" />
+                <span className="text-text-label">Disconnected</span>
+              </>
+            )}
+          </div>
+          <div className={`status-dot ${connected ? 'live' : 'offline'}`} />
         </div>
-        <div className={`status-dot ${connected ? 'live' : 'offline'}`} />
-      </div>
-      </div>
-    </header>
+      </header>
+    </div>
   );
 }
