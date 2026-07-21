@@ -18,11 +18,9 @@ from twilio.twiml.voice_response import VoiceResponse
 from llm_utils import generate_call_summary
 from db_utils import (
     get_caller_context, get_agent_by_role,
-    add_customer_to_queue, get_queue_position, get_next_customer,
-    get_queue_length, get_available_agents_count, update_agent_status,
-    get_agent_status, remove_customer_from_queue, get_estimated_wait_time,
     get_room_transcriptions, get_transcription_summary
 )
+from queue_manager import queue_manager
 from deepgram_utils import transcribe_base64_audio
 from ai_chat_utils import generate_ai_response, create_conversation_entry
 from models import (
@@ -214,8 +212,9 @@ async def create_room_endpoint(request: CreateRoomRequest):
     try:
         # Always add customer to queue first, regardless of agent availability
         # This ensures proper queue management and agent-controlled connections
-        position = add_customer_to_queue(request.email, request.caller_type)
-        estimated_wait = get_estimated_wait_time(position)
+        status = queue_manager.add_customer(request.email, request.caller_type)
+        position = status["position"]
+        estimated_wait = status["estimated_wait_time"]
         
         logger.info(f"Customer {request.email} added to queue at position {position}")
 
@@ -456,13 +455,25 @@ async def get_caller_context_endpoint(request: CallerContextRequest):
 async def get_queue_status(request: QueueStatusRequest):
     """Get customer's current queue status"""
     try:
-        position = get_queue_position(request.email)
-        if position is None:
+        status = queue_manager.get_customer_status(request.email)
+        if status is None:
+            # If this customer was already assigned via WebSocket flow, return token immediately
+            if request.email in assigned_customers:
+                info = assigned_customers.pop(request.email)
+                return QueueStatusResponse(
+                    position=0,
+                    estimated_wait_time=0,
+                    total_waiting=queue_manager.get_queue_length(),
+                    agents_available=queue_manager.get_available_agents_count(),
+                    access_token=info.get("customer_token", ""),
+                    room_name=info.get("room_name", "support_room")
+                )
             raise HTTPException(status_code=404, detail="Customer not found in queue")
 
-        estimated_wait = get_estimated_wait_time(position)
-        total_waiting = get_queue_length()
-        agents_available = get_available_agents_count()
+        position = status["position"]
+        estimated_wait = status["estimated_wait_time"]
+        total_waiting = status["total_waiting"]
+        agents_available = status["agents_available"]
 
         # If this customer was already assigned via WebSocket flow, return token immediately
         if request.email in assigned_customers:
@@ -470,8 +481,8 @@ async def get_queue_status(request: QueueStatusRequest):
             return QueueStatusResponse(
                 position=0,
                 estimated_wait_time=0,
-                total_waiting=get_queue_length(),
-                agents_available=get_available_agents_count(),
+                total_waiting=queue_manager.get_queue_length(),
+                agents_available=queue_manager.get_available_agents_count(),
                 access_token=info.get("customer_token", ""),
                 room_name=info.get("room_name", "support_room")
             )
@@ -482,42 +493,38 @@ async def get_queue_status(request: QueueStatusRequest):
         if position == 1 and agents_available > 0:
             # Select agent (demo: agent_a)
             selected_agent = "agent_a"
-            if get_agent_status(selected_agent) and get_agent_status(selected_agent).get("status") == "available":
-                # Pop customer from queue
-                next_customer = get_next_customer()
-                if next_customer and next_customer['email'] == request.email:
-                    # Create dynamic room
-                    room_name = f"support_{selected_agent}_{next_customer['email'].replace('@', '_').replace('.', '_')}"
-                    await create_room(room_name)
+            # Try to assign agent_a to this customer
+            next_customer = queue_manager.try_assign_agent_to_customer(request.email, selected_agent)
+            if next_customer:
+                # Create dynamic room
+                room_name = f"support_{selected_agent}_{next_customer['email'].replace('@', '_').replace('.', '_')}"
+                await create_room(room_name)
 
-                    # Generate customer token
-                    access_token = create_room_token(room_name, f"customer_{next_customer['email']}")
+                # Generate customer token
+                access_token = create_room_token(room_name, f"customer_{next_customer['email']}")
 
-                    # Update agent busy
-                    update_agent_status(selected_agent, "busy", next_customer['email'])
+                # Broadcast to agent
+                agent_token = create_room_token(room_name, f"agent_{selected_agent}")
+                agent_notification = {
+                    "type": "customer_assigned",
+                    "agent_id": selected_agent,
+                    "customer_email": next_customer['email'],
+                    "room_name": room_name,
+                    "agent_token": agent_token
+                }
+                await send_to_agent(selected_agent, agent_notification)
 
-                    # Broadcast to agent
-                    agent_token = create_room_token(room_name, f"agent_{selected_agent}")
-                    agent_notification = {
-                        "type": "customer_assigned",
-                        "agent_id": selected_agent,
-                        "customer_email": next_customer['email'],
-                        "room_name": room_name,
-                        "agent_token": agent_token
-                    }
-                    await send_to_agent(selected_agent, agent_notification)
+                logger.info(f"Queue connect: assigned {request.email} to {selected_agent} in {room_name}")
 
-                    logger.info(f"Queue connect: assigned {request.email} to {selected_agent} in {room_name}")
+                # Store assignment for HTTP fallback to the specific customer
+                assigned_customers[next_customer['email']] = {
+                    "room_name": room_name,
+                    "customer_token": access_token
+                }
 
-                    # Store assignment for HTTP fallback to the specific customer
-                    assigned_customers[next_customer['email']] = {
-                        "room_name": room_name,
-                        "customer_token": access_token
-                    }
-
-                    # Update position to 0 (connected)
-                    position = 0
-                    estimated_wait = 0
+                # Update position to 0 (connected)
+                position = 0
+                estimated_wait = 0
 
         return QueueStatusResponse(
             position=position,
@@ -536,11 +543,11 @@ async def get_queue_status(request: QueueStatusRequest):
 async def update_agent_availability(request: AgentAvailabilityRequest):
     """Update agent availability status"""
     try:
-        update_agent_status(request.agent_id, request.status)
+        queue_manager.set_agent_status(request.agent_id, request.status)
 
         # If agent becomes available, try to connect them with next customer
         if request.status == "available":
-            next_customer = get_next_customer()
+            next_customer = queue_manager.try_assign_customer(request.agent_id)
             if next_customer:
                 logger.info(f"Agent {request.agent_id} available, popping customer {next_customer['email']}")
                 # Create room for this customer-agent pair
@@ -550,9 +557,6 @@ async def update_agent_availability(request: AgentAvailabilityRequest):
                 # Generate tokens
                 agent_token = create_room_token(room_name, f"agent_{request.agent_id}")
                 customer_token = create_room_token(room_name, f"customer_{next_customer['email']}")
-
-                # Update agent status to busy
-                update_agent_status(request.agent_id, "busy", next_customer['email'])
 
                 # Targeted notify agent for auto-join
                 notification = {
@@ -589,17 +593,16 @@ async def update_agent_availability(request: AgentAvailabilityRequest):
 async def pick_next_customer(request: PickNextCustomerRequest):
     """Agent picks next customer from queue"""
     try:
-        # Check if agent is available
-        agent_status = get_agent_status(request.agent_id)
-        if not agent_status or agent_status.get("status") != "available":
-            return PickNextCustomerResponse(
-                success=False,
-                message="Agent is not available to take calls"
-            )
-
-        # Get next customer from queue
-        next_customer = get_next_customer()
+        # Check if agent is available and pop next customer in a unified step
+        next_customer = queue_manager.try_assign_customer(request.agent_id)
         if not next_customer:
+            # Check status to return specific error message
+            agent_status = queue_manager.get_agent_status(request.agent_id)
+            if not agent_status or agent_status.get("status") != "available":
+                return PickNextCustomerResponse(
+                    success=False,
+                    message="Agent is not available to take calls"
+                )
             return PickNextCustomerResponse(
                 success=False,
                 message="No customers in queue"
@@ -613,9 +616,6 @@ async def pick_next_customer(request: PickNextCustomerRequest):
         # Generate tokens
         agent_token = create_room_token(room_name, f"agent_{request.agent_id}")
         customer_token = create_room_token(room_name, f"customer_{next_customer['email']}")
-
-        # Update agent status to busy
-        update_agent_status(request.agent_id, "busy", next_customer['email'])
 
         # Targeted notify agent for auto-join
         notification = {
