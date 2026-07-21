@@ -87,11 +87,10 @@ npm install
 cd backend
 
 # Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python3 -m venv venv
+source venv/bin/activate
+python -m pip install -r requirements.txt
 
-# Install Python dependencies
-pip install -r requirements.txt
 
 # Copy environment template and configure
 cp env.example .env
