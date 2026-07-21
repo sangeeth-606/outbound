@@ -186,8 +186,8 @@
 }
 
 @keyframes marquee {
-  0% { transform: translateX(100%); }
-  100% { transform: translateX(-100%); }
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
 .marquee-track {
@@ -196,9 +196,8 @@
 }
 
 .marquee-content {
-  display: inline-block;
-  animation: marquee 25s linear infinite;
-  padding-right: 60px;
+  display: flex;
+  animation: marquee 30s linear infinite;
 }
 
 .lk-participant-tile .lk-participant-name,

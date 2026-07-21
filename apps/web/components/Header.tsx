@@ -36,9 +36,10 @@ export function Header() {
     <div className="flex-shrink-0">
       <div className="h-6 bg-surface-card border-b border-border-separator overflow-hidden relative flex items-center">
         <div className="marquee-track absolute inset-0 flex items-center">
-          <span className="text-[10px] text-accent-warning tracking-widest uppercase whitespace-nowrap marquee-content">
-            {marqueeText}
-          </span>
+          <div className="marquee-content">
+            <span className="text-[10px] text-accent-warning tracking-widest uppercase whitespace-nowrap px-8">{marqueeText}</span>
+            <span className="text-[10px] text-accent-warning tracking-widest uppercase whitespace-nowrap px-8">{marqueeText}</span>
+          </div>
         </div>
       </div>
       <header className="h-12 bg-surface-secondary border-b border-border-separator flex items-center justify-between px-6">
