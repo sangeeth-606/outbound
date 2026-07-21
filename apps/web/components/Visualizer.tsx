@@ -23,7 +23,6 @@ const Visualizer = ({ microphone }: { microphone: MediaRecorder }) => {
     let animationId: number;
     
     try {
-      // Create audio context
       audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       analyser = audioContext.createAnalyser();
       analyser.fftSize = 256;
@@ -56,8 +55,10 @@ const Visualizer = ({ microphone }: { microphone: MediaRecorder }) => {
 
         const barWidth = 10;
         let x = 0;
-        const startColor = [19, 239, 147];
-        const endColor = [20, 154, 251];
+
+        // Dark console theme colors
+        const startColor = [0, 255, 209];  // #00FFD1 cyan
+        const endColor = [255, 107, 107];   // #FF6B6B red
 
         for (const value of dataArray) {
           const barHeight = (value / 255) * height * 2;
@@ -66,7 +67,7 @@ const Visualizer = ({ microphone }: { microphone: MediaRecorder }) => {
 
           const color = interpolateColor(startColor, endColor, interpolationFactor);
 
-          context.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.1)`;
+          context.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0.08)`;
           context.fillRect(x, height - barHeight, barWidth, barHeight);
           x += barWidth;
         }

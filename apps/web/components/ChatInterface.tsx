@@ -25,12 +25,10 @@ export default function ChatInterface({ callerType, email, className = '' }: Cha
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Initialize with welcome message
   useEffect(() => {
     const welcomeMessage = callerType === 'investor' 
       ? "Hello! I'm here to help with your investment questions. How can I assist you today?"
@@ -79,8 +77,6 @@ export default function ChatInterface({ callerType, email, className = '' }: Cha
           timestamp: new Date().toISOString()
         };
         setMessages(prev => [...prev, assistantMessage]);
-        
-        // Speak the response
         speakText(data.response);
       } else {
         throw new Error(data.error || 'Failed to get response');
@@ -100,7 +96,6 @@ export default function ChatInterface({ callerType, email, className = '' }: Cha
 
   const speakText = (text: string) => {
     if ('speechSynthesis' in window) {
-      // Stop any current speech
       window.speechSynthesis.cancel();
       
       const utterance = new SpeechSynthesisUtterance(text);
@@ -159,7 +154,6 @@ export default function ChatInterface({ callerType, email, className = '' }: Cha
 
   const transcribeAndSend = async (audioBlob: Blob) => {
     try {
-      // Convert audio to base64
       const arrayBuffer = await audioBlob.arrayBuffer();
       const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
 
@@ -178,14 +172,12 @@ export default function ChatInterface({ callerType, email, className = '' }: Cha
       const data = await response.json();
 
       if (data.success) {
-        // Add user message (transcript)
         const userMessage: ChatMessage = {
           role: 'user',
           content: data.transcript,
           timestamp: new Date().toISOString()
         };
 
-        // Add assistant response
         const assistantMessage: ChatMessage = {
           role: 'assistant',
           content: data.ai_response,
@@ -193,8 +185,6 @@ export default function ChatInterface({ callerType, email, className = '' }: Cha
         };
 
         setMessages(prev => [...prev, userMessage, assistantMessage]);
-        
-        // Speak the response
         speakText(data.ai_response);
       } else {
         throw new Error(data.error || 'Failed to transcribe audio');
@@ -216,16 +206,14 @@ export default function ChatInterface({ callerType, email, className = '' }: Cha
   };
 
   return (
-    <div className={`flex flex-col h-full bg-white rounded-lg shadow-lg ${className}`}>
-      {/* Chat Header */}
-      <div className="bg-blue-900 text-white p-4 rounded-t-lg">
-        <h3 className="text-lg font-semibold">
+    <div className={`flex flex-col h-full bg-surface-card rounded-md border border-border-dim ${className}`}>
+      <div className="bg-surface-secondary text-text-main px-4 py-3 rounded-t-md border-b border-border-dim">
+        <h3 className="text-xs font-bold uppercase tracking-wider">
           {callerType === 'investor' ? 'Investor Support Chat' : 'Prospect Inquiry Chat'}
         </h3>
-        <p className="text-blue-200 text-sm">Email: {email}</p>
+        <p className="text-text-muted text-xs">{email}</p>
       </div>
 
-      {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message, index) => (
           <div
@@ -233,15 +221,15 @@ export default function ChatInterface({ callerType, email, className = '' }: Cha
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+              className={`max-w-xs lg:max-w-md px-3 py-2 rounded-md text-xs ${
                 message.role === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-800'
+                  ? 'bg-accent-red text-white'
+                  : 'bg-surface-secondary text-text-main border border-border-dim'
               }`}
             >
-              <p className="text-sm">{message.content}</p>
+              <p>{message.content}</p>
               {message.timestamp && (
-                <p className="text-xs opacity-70 mt-1">
+                <p className="text-[10px] opacity-70 mt-1">
                   {new Date(message.timestamp).toLocaleTimeString()}
                 </p>
               )}
@@ -250,11 +238,11 @@ export default function ChatInterface({ callerType, email, className = '' }: Cha
         ))}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            <div className="bg-surface-secondary text-text-main px-4 py-2 rounded-md border border-border-dim">
+              <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 bg-text-muted rounded-full animate-bounce"></div>
+                <div className="w-1.5 h-1.5 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-1.5 h-1.5 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
           </div>
@@ -262,52 +250,50 @@ export default function ChatInterface({ callerType, email, className = '' }: Cha
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="p-4 border-t bg-gray-50 rounded-b-lg">
-        <form onSubmit={handleSubmit} className="flex space-x-2">
+      <div className="p-4 border-t border-border-dim bg-surface-secondary rounded-b-md">
+        <form onSubmit={handleSubmit} className="flex gap-2">
           <input
             type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             placeholder="Type your message..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input flex-1 text-xs"
             disabled={isLoading}
           />
           <button
             type="submit"
             disabled={isLoading || !inputMessage.trim()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-accent px-3 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-3 h-3" />
           </button>
         </form>
 
-        {/* Voice Controls */}
-        <div className="flex justify-center space-x-4 mt-3">
+        <div className="flex justify-center gap-4 mt-3">
           <button
             onClick={isRecording ? stopRecording : startRecording}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
+            className={`btn text-xs ${
               isRecording
-                ? 'bg-red-600 text-white hover:bg-red-700'
-                : 'bg-green-600 text-white hover:bg-green-700'
+                ? 'bg-accent-red text-white hover:bg-accent-red/80'
+                : 'bg-accent-success/20 text-accent-success hover:bg-accent-success/30 border border-accent-success/30'
             }`}
             disabled={isLoading}
           >
-            {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            <span>{isRecording ? 'Stop Recording' : 'Voice Message'}</span>
+            {isRecording ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+            <span>{isRecording ? 'Stop' : 'Voice'}</span>
           </button>
 
           <button
             onClick={isSpeaking ? stopSpeaking : () => speakText(messages[messages.length - 1]?.content || '')}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
+            className={`btn text-xs ${
               isSpeaking
-                ? 'bg-orange-600 text-white hover:bg-orange-700'
-                : 'bg-gray-600 text-white hover:bg-gray-700'
+                ? 'bg-accent-warning/20 text-accent-warning hover:bg-accent-warning/30 border border-accent-warning/30'
+                : 'bg-surface-card text-text-muted hover:text-text-main border border-border-dim'
             }`}
             disabled={messages.length === 0}
           >
-            {isSpeaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-            <span>{isSpeaking ? 'Stop Speaking' : 'Repeat Last'}</span>
+            {isSpeaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+            <span>{isSpeaking ? 'Stop' : 'Repeat'}</span>
           </button>
         </div>
       </div>

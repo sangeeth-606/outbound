@@ -38,7 +38,6 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
   const [isConnected, setIsConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Expose methods to parent component
   useImperativeHandle(ref, () => ({
     addAutoMessage: (messageText: string) => {
       console.log('🏪 LiveKitChatInterface.addAutoMessage called with:', messageText);
@@ -59,11 +58,10 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
       setMessages(prev => {
         console.log('🏪 Current messages count:', prev.length);
         
-        // Check if this message already exists to avoid duplicates
         const messageExists = prev.some(msg => 
           msg.content === autoMessage.content && 
           msg.senderIdentity === autoMessage.senderIdentity &&
-          Math.abs(msg.timestamp.getTime() - autoMessage.timestamp.getTime()) < 2000 // 2 second window
+          Math.abs(msg.timestamp.getTime() - autoMessage.timestamp.getTime()) < 2000
         );
         
         if (messageExists) {
@@ -89,19 +87,17 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
       };
       
       console.log('Adding summary message to chat display:', summaryMessage);
-      setMessages(prev => [summaryMessage, ...prev]); // Add at the beginning
+      setMessages(prev => [summaryMessage, ...prev]);
     },
     getChatHistory: () => {
-      return messages.filter(msg => msg.type === 'message'); // Only return regular messages
+      return messages.filter(msg => msg.type === 'message');
     }
   }), [room, messages]);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Check room connection status
   useEffect(() => {
     const checkConnection = () => {
       setIsConnected(room.state === 'connected');
@@ -109,7 +105,6 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
 
     checkConnection();
     
-    // Listen for connection state changes
     room.on('connectionStateChanged', checkConnection);
     
     return () => {
@@ -117,7 +112,6 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
     };
   }, [room]);
 
-  // Set up text stream handler for receiving messages
   useEffect(() => {
     if (!room) return;
 
@@ -149,7 +143,6 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
           };
 
           setMessages(prev => {
-            // Check if this message already exists to avoid duplicates
             const messageExists = prev.some(msg => 
               msg.content === newMessage.content && 
               msg.senderIdentity === newMessage.senderIdentity &&
@@ -161,8 +154,6 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
               return prev;
             }
             
-            // If it's a local message, don't add it again through text stream
-            // (it should have been added immediately when sent)
             if (isLocalMessage) {
               console.log('Local message received through text stream, checking if already displayed');
               const localMessageExists = prev.some(msg => 
@@ -186,11 +177,9 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
       }
     };
 
-    // Register handler for 'chat' topic
     room.registerTextStreamHandler('chat', handleTextStream);
 
     return () => {
-      // Clean up handler
       try {
         room.unregisterTextStreamHandler('chat');
       } catch (error) {
@@ -207,7 +196,6 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
     try {
       console.log('Sending manual message:', messageText);
       
-      // Immediately add the message to local state so sender can see it
       const localMessage: ChatMessage = {
         id: `${Date.now()}-${Math.random()}`,
         content: messageText,
@@ -221,7 +209,6 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
       setMessages(prev => [...prev, localMessage]);
       console.log('Added local message to chat display:', localMessage);
       
-      // Send message via LiveKit text stream
       await room.localParticipant.sendText(messageText, { topic: 'chat' });
       setInputMessage('');
       console.log('Manual message sent successfully');
@@ -246,7 +233,6 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
   const getSenderDisplayName = (message: ChatMessage) => {
     if (message.isLocal) return 'You';
     
-    // Determine sender type based on identity
     if (message.senderIdentity.includes('agent')) {
       return `Agent ${message.senderIdentity.replace('agent_', '').toUpperCase()}`;
     }
@@ -258,32 +244,29 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
   };
 
   return (
-    <div className={`flex flex-col h-full bg-white rounded-lg shadow-lg border border-gray-200 font-sans antialiased ${className}`}>
-      {/* Chat Header */}
-      <div className="bg-red-400 text-white p-3 rounded-t-lg flex items-center space-x-2">
-        <MessageSquare className="w-5 h-5" />
+    <div className={`flex flex-col h-full bg-surface-card rounded-md border border-border-dim ${className}`}>
+      <div className="bg-surface-secondary text-text-main px-3 py-2.5 rounded-t-md flex items-center gap-2 border-b border-border-dim">
+        <MessageSquare className="w-4 h-4 text-accent-red" />
         <div>
-          <h3 className="text-sm font-bold tracking-tight">Live Chat</h3>
-          <p className="text-xs text-red-100 font-medium">
+          <h3 className="text-xs font-bold tracking-wide uppercase">Live Chat</h3>
+          <p className="text-[10px] text-text-muted">
             {isConnected ? 'Connected' : 'Disconnected'} • {localUserType === 'caller' ? 'Customer' : 'Agent'} View
           </p>
         </div>
         <div className="ml-auto">
-          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-200'}`}></div>
+          <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-accent-success' : 'bg-accent-red'}`}></div>
         </div>
       </div>
 
-      {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
         {messages.length === 0 && (
-          <div className="text-center text-gray-600 text-sm py-4 font-medium">
+          <div className="text-center text-text-muted text-xs py-4">
             {isConnected 
               ? 'Chat is ready. Send a message to start the conversation!'
               : (
                 <div className="space-y-2">
-                  <p className="font-semibold">💬 Live Chat Interface</p>
-                  <p className="text-xs text-gray-500">This will be active when connected to a call</p>
-                  <p className="text-xs text-gray-500">You can type messages and they'll be sent in real-time</p>
+                  <p className="text-xs font-bold text-text-label uppercase tracking-wider">Chat Interface</p>
+                  <p className="text-[10px] text-text-muted">This will be active when connected to a call</p>
                 </div>
               )
             }
@@ -296,43 +279,41 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
             className={`flex ${message.type === 'summary' ? 'justify-center' : message.isLocal ? 'justify-end' : 'justify-start'}`}
           >
             {message.type === 'summary' ? (
-              // Summary message styling
               <div className="w-full max-w-full mb-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 shadow-sm">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-sm font-bold text-blue-700 uppercase tracking-wide">
+                <div className="bg-accent-cyan/10 border border-accent-cyan/20 rounded-md p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-accent-cyan"></div>
+                    <span className="text-xs font-bold text-accent-cyan uppercase tracking-wide">
                       {message.sender}
                     </span>
-                    <span className="text-xs text-blue-500 font-medium">
+                    <span className="text-[10px] text-text-muted">
                       {message.timestamp.toLocaleTimeString([], { 
                         hour: '2-digit', 
                         minute: '2-digit' 
                       })}
                     </span>
                   </div>
-                  <div className="text-sm text-blue-800 leading-relaxed whitespace-pre-wrap">
+                  <div className="text-xs text-text-main leading-relaxed whitespace-pre-wrap">
                     {message.content}
                   </div>
                 </div>
               </div>
             ) : (
-              // Regular message styling
               <div
-                className={`max-w-[80%] px-3 py-2 rounded-lg text-sm font-medium ${
+                className={`max-w-[80%] px-3 py-2 rounded-md text-xs ${
                   message.isLocal
-                    ? 'bg-red-400 text-white'
-                    : 'bg-gray-100 text-gray-800'
+                    ? 'bg-accent-red text-white'
+                    : 'bg-surface-secondary text-text-main border border-border-dim'
                 }`}
               >
-                <div className="flex items-center space-x-2 mb-1">
-                  <span className={`text-xs font-semibold tracking-wide ${
-                    message.isLocal ? 'text-red-100' : 'text-gray-600'
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className={`text-[10px] font-bold tracking-wide ${
+                    message.isLocal ? 'text-white/70' : 'text-text-label'
                   }`}>
                     {getSenderDisplayName(message)}
                   </span>
-                  <span className={`text-xs font-medium ${
-                    message.isLocal ? 'text-red-100' : 'text-gray-500'
+                  <span className={`text-[10px] ${
+                    message.isLocal ? 'text-white/50' : 'text-text-muted'
                   }`}>
                     {message.timestamp.toLocaleTimeString([], { 
                       hour: '2-digit', 
@@ -348,30 +329,29 @@ const LiveKitChatInterface = forwardRef<LiveKitChatInterfaceRef, LiveKitChatInte
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="p-3 border-t bg-gray-50 rounded-b-lg">
-        <form onSubmit={handleSubmit} className="flex space-x-2">
+      <div className="p-3 border-t border-border-dim bg-surface-secondary rounded-b-md">
+        <form onSubmit={handleSubmit} className="flex gap-2">
           <input
             type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder={isConnected ? "Type a message..." : "Waiting for connection..."}
-            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent font-medium text-gray-900 placeholder:text-gray-500"
+            className="input flex-1 text-xs"
             disabled={!isConnected}
             maxLength={1000}
           />
           <button
             type="submit"
             disabled={!isConnected || !inputMessage.trim()}
-            className="px-3 py-2 bg-red-400 text-white rounded-lg hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
+            className="btn btn-accent px-3 disabled:opacity-50 disabled:cursor-not-allowed"
             title="Send message"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-3 h-3" />
           </button>
         </form>
         {!isConnected && (
-          <p className="text-xs text-gray-500 mt-1 text-center font-medium">
+          <p className="text-[10px] text-text-muted mt-1 text-center">
             Chat will be available once connected to the call
           </p>
         )}

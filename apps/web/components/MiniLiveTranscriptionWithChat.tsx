@@ -32,12 +32,10 @@ const MiniLiveTranscription = ({ room, className = "" }: MiniLiveTranscriptionPr
   const captionTimeout = useRef<any>(null);
   const keepAliveInterval = useRef<any>(null);
 
-  // Function to send transcribed text to LiveKit chat
   const sendToChat = async (text: string) => {
     if (!room || !text.trim() || !isAutoSendEnabled) return;
     
     try {
-      // Add a prefix to indicate this is from voice transcription
       const messageText = `🎤 ${text.trim()}`;
       await room.localParticipant.sendText(messageText, { topic: 'chat' });
       console.log("Sent transcription to chat:", messageText);
@@ -94,7 +92,6 @@ const MiniLiveTranscription = ({ room, className = "" }: MiniLiveTranscriptionPr
         setCaption(thisCaption);
       }
 
-      // Send to chat when speech is final and complete
       if (isFinal && speechFinal && thisCaption && thisCaption.trim()) {
         sendToChat(thisCaption);
         
@@ -151,60 +148,56 @@ const MiniLiveTranscription = ({ room, className = "" }: MiniLiveTranscriptionPr
 
   return (
     <div className={`fixed top-4 right-4 z-50 ${className}`}>
-      <div className={`bg-gradient-to-br from-gray-900 to-gray-800 backdrop-blur-sm rounded-lg shadow-lg border border-gray-700 transition-all duration-300 ${
+      <div className={`bg-surface-card border border-border-dim rounded-md shadow-lg transition-all duration-300 ${
         isMinimized ? 'w-16 h-16' : 'w-80 max-w-sm'
       }`}>
         
-        {/* Minimized View */}
         {isMinimized ? (
           <div className="h-full flex items-center justify-center">
             <button
               onClick={() => setIsMinimized(false)}
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
                 isRecording 
-                  ? 'bg-red-500 hover:bg-red-600 text-white' 
-                  : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                  ? 'bg-accent-red hover:bg-accent-red/80 text-white' 
+                  : 'bg-surface-secondary hover:bg-surface-hover text-text-muted'
               }`}
             >
               {isRecording ? <Mic size={20} /> : <MicOff size={20} />}
             </button>
           </div>
         ) : (
-          /* Expanded View */
-          <div className="p-4 text-white">
-            {/* Header */}
+          <div className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-200">Live Transcription</h3>
-              <div className="flex items-center space-x-1">
+              <h3 className="text-xs font-bold text-text-main uppercase tracking-wider">Live Transcription</h3>
+              <div className="flex items-center gap-1">
                 {room && (
                   <button
                     onClick={() => setShowSettings(!showSettings)}
-                    className="p-1 rounded hover:bg-gray-700 transition-colors"
+                    className="p-1 rounded hover:bg-surface-hover transition-colors"
                     title="Settings"
                   >
-                    <Settings size={14} />
+                    <Settings size={14} className="text-text-muted" />
                   </button>
                 )}
                 <button
                   onClick={() => setIsMinimized(true)}
-                  className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded transition-colors"
+                  className="text-xs bg-surface-secondary hover:bg-surface-hover text-text-muted px-2 py-1 rounded transition-colors"
                 >
                   −
                 </button>
               </div>
             </div>
 
-            {/* Settings Panel */}
             {showSettings && room && (
-              <div className="mb-3 p-2 bg-gray-800 rounded border border-gray-600">
+              <div className="mb-3 p-2 bg-surface-secondary rounded border border-border-dim">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-300">Auto-send to chat:</span>
+                  <span className="text-[10px] text-text-muted">Auto-send to chat:</span>
                   <button
                     onClick={() => setIsAutoSendEnabled(!isAutoSendEnabled)}
-                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                    className={`px-2 py-0.5 text-[10px] rounded transition-colors font-bold ${
                       isAutoSendEnabled 
-                        ? 'bg-blue-500 hover:bg-blue-600 text-white' 
-                        : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                        ? 'bg-accent-cyan text-white' 
+                        : 'bg-surface-card text-text-muted border border-border-dim'
                     }`}
                   >
                     {isAutoSendEnabled ? 'ON' : 'OFF'}
@@ -213,74 +206,68 @@ const MiniLiveTranscription = ({ room, className = "" }: MiniLiveTranscriptionPr
               </div>
             )}
 
-            {/* Controls */}
-            <div className="flex items-center space-x-2 mb-3">
+            <div className="flex items-center gap-2 mb-3">
               <button
                 onClick={toggleTranscription}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md font-medium transition-all ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
                   isRecording 
-                    ? 'bg-red-500 hover:bg-red-600 text-white' 
-                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                    ? 'bg-accent-red text-white hover:bg-accent-red/80' 
+                    : 'bg-surface-secondary text-text-main border border-border-dim hover:bg-surface-hover'
                 }`}
               >
-                {isRecording ? <MicOff size={16} /> : <Mic size={16} />}
-                <span className="text-sm">
-                  {isRecording ? 'Stop' : 'Start'}
-                </span>
+                {isRecording ? <MicOff size={14} /> : <Mic size={14} />}
+                <span>{isRecording ? 'Stop' : 'Start'}</span>
               </button>
 
               {room && (
                 <button
                   onClick={() => setIsAutoSendEnabled(!isAutoSendEnabled)}
-                  className={`p-2 rounded-md transition-colors ${
+                  className={`p-1.5 rounded transition-colors ${
                     isAutoSendEnabled 
-                      ? 'bg-green-500 hover:bg-green-600 text-white' 
-                      : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
+                      ? 'bg-accent-cyan/10 text-accent-cyan hover:bg-accent-cyan/20' 
+                      : 'bg-surface-secondary text-text-muted hover:bg-surface-hover'
                   }`}
                   title={isAutoSendEnabled ? "Auto-send to chat: ON" : "Auto-send to chat: OFF"}
                 >
-                  <MessageSquare size={16} />
+                  <MessageSquare size={14} />
                 </button>
               )}
             </div>
 
-            {/* Status */}
-            <div className="text-xs text-gray-400 mb-2 space-y-1">
+            <div className="text-[10px] text-text-muted mb-2 space-y-1">
               <div className="flex justify-between">
                 <span>Status:</span>
-                <span className={isConnected ? 'text-green-400' : 'text-yellow-400'}>
+                <span className={isConnected ? 'text-accent-success' : 'text-accent-warning'}>
                   {isConnected ? 'Connected' : 'Connecting...'}
                 </span>
               </div>
               {room && (
                 <div className="flex justify-between">
                   <span>Chat Auto-send:</span>
-                  <span className={isAutoSendEnabled ? 'text-green-400' : 'text-gray-400'}>
+                  <span className={isAutoSendEnabled ? 'text-accent-success' : 'text-text-muted'}>
                     {isAutoSendEnabled ? 'Enabled' : 'Disabled'}
                   </span>
                 </div>
               )}
             </div>
 
-            {/* Transcription Display */}
-            <div className="bg-black/30 rounded-md p-3 min-h-[80px] max-h-[120px] overflow-y-auto border border-gray-600">
-              <div className="text-sm">
+            <div className="bg-surface-primary rounded p-3 min-h-[80px] max-h-[120px] overflow-y-auto border border-border-dim">
+              <div className="text-xs">
                 {caption ? (
-                  <span className={isRecording ? 'text-green-300' : 'text-gray-300'}>
+                  <span className={isRecording ? 'text-accent-success' : 'text-text-main'}>
                     {caption}
                   </span>
                 ) : (
-                  <span className="text-gray-500 italic">
+                  <span className="text-text-muted italic">
                     {isConnected ? "Ready to transcribe..." : "Connecting..."}
                   </span>
                 )}
               </div>
             </div>
 
-            {/* Help Text */}
             {room && isAutoSendEnabled && (
-              <div className="mt-2 text-xs text-gray-500 text-center">
-                🎤 Speech will be sent to chat automatically
+              <div className="mt-2 text-[10px] text-text-muted text-center">
+                Speech will be sent to chat automatically
               </div>
             )}
           </div>

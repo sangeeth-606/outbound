@@ -437,11 +437,11 @@ export default function Home() {
 
   if (isConnecting || queueStatus === 'connecting') {
     return (
-      <div className="min-h-screen bg-gray-50 text-gray-900 flex items-center justify-center font-sans antialiased">
-        <div className="bg-white rounded-lg shadow-md p-8 max-w-md mx-auto border border-gray-200">
-          <div className="animate-spin w-8 h-8 border-2 border-red-400 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <h2 className="text-xl font-bold mb-2 text-gray-900 tracking-tight">Connecting...</h2>
-          <p className="text-gray-600 font-medium">Please wait while we connect you to support</p>
+      <div className="min-h-screen bg-surface-primary text-text-main flex items-center justify-center">
+        <div className="card p-8 max-w-md mx-auto">
+          <div className="animate-spin w-8 h-8 border-2 border-accent-red border-t-transparent rounded-full mx-auto mb-4"></div>
+          <h2 className="text-lg font-bold mb-2 text-text-main tracking-tight">Connecting...</h2>
+          <p className="text-xs text-text-muted">Please wait while we connect you to support</p>
         </div>
       </div>
     );
@@ -449,24 +449,24 @@ export default function Home() {
 
   if (queueStatus === 'waiting') {
     return (
-      <div className="min-h-screen bg-gray-50 text-gray-900 flex items-center justify-center font-sans antialiased">
-        <div className="bg-white rounded-lg shadow-md p-8 max-w-md mx-auto border border-gray-200">
-          <div className="animate-pulse w-16 h-16 bg-red-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-            <Users className="w-8 h-8 text-red-400" />
+      <div className="min-h-screen bg-surface-primary text-text-main flex items-center justify-center">
+        <div className="card p-8 max-w-md mx-auto">
+          <div className="animate-pulse w-16 h-16 bg-accent-red/15 rounded-full mx-auto mb-4 flex items-center justify-center">
+            <Users className="w-8 h-8 text-accent-red" />
           </div>
-          <h2 className="text-xl font-bold mb-2 text-gray-900 tracking-tight">Waiting in Queue</h2>
-          <p className="text-gray-600 mb-4 font-medium">All our agents are currently busy. You're in the queue to speak with support.</p>
+          <h2 className="text-lg font-bold mb-2 text-text-main tracking-tight">Waiting in Queue</h2>
+          <p className="text-xs text-text-muted mb-4">All our agents are currently busy. You're in the queue to speak with support.</p>
 
           {queuePosition && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+            <div className="bg-surface-secondary border border-border-dim rounded-lg p-4 mb-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-700 font-semibold">Your Position:</span>
-                <span className="text-red-400 font-bold text-lg tracking-tight">#{queuePosition}</span>
+                <span className="text-xs text-text-label font-bold">Position:</span>
+                <span className="text-accent-red font-bold text-lg tracking-tight">#{queuePosition}</span>
               </div>
               {estimatedWaitTime && (
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-700 font-semibold">Estimated Wait:</span>
-                  <span className="text-red-400 font-bold tracking-tight">
+                  <span className="text-xs text-text-label font-bold">Est. Wait:</span>
+                  <span className="text-accent-red font-bold tracking-tight">
                     {Math.floor(estimatedWaitTime / 60)}:{(estimatedWaitTime % 60).toString().padStart(2, '0')}
                   </span>
                 </div>
@@ -485,7 +485,7 @@ export default function Home() {
                 setQueuePosition(null);
                 setEstimatedWaitTime(null);
               }}
-              className="bg-red-400 hover:bg-red-500 text-white px-6 py-3 rounded-lg font-bold tracking-wide transition-colors"
+              className="btn btn-accent px-6"
             >
               Cancel
             </button>
@@ -497,8 +497,8 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 text-gray-900 flex items-center justify-center font-sans antialiased">
-        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg max-w-md mx-auto font-semibold">
+      <div className="min-h-screen bg-surface-primary text-text-main flex items-center justify-center">
+        <div className="bg-accent-red/10 border border-accent-red/30 text-accent-red p-4 rounded-md max-w-md mx-auto text-xs font-bold">
           Error: {error}
         </div>
       </div>
@@ -507,49 +507,48 @@ export default function Home() {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans antialiased">
-        <main className="flex-1 w-full flex justify-center items-center px-4 md:px-8 lg:px-20 pb-8">
+      <div className="h-full flex flex-col">
+        <div className="flex-1 w-full flex justify-center items-center px-4">
           <section className="w-full max-w-md">
-            <h2 className="text-2xl font-semibold mb-6 text-gray-900 text-center tracking-tight">Start Your Call</h2>
-            <form className="space-y-6">
+            <h2 className="text-sm font-bold text-text-label uppercase tracking-widest mb-6 text-center">Start Your Call</h2>
+            <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); connectToCall(); }}>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2 tracking-wide">Your Email Address</label>
+                <label className="block text-xs font-bold text-text-label mb-2 tracking-wide uppercase">Email Address</label>
                 <input
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 bg-white text-gray-900 font-medium placeholder:text-gray-500 placeholder:font-normal"
+                  className="input w-full"
                   placeholder="you@example.com"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2 tracking-wide">Caller Type</label>
+                <label className="block text-xs font-bold text-text-label mb-2 tracking-wide uppercase">Caller Type</label>
                 <select
                   value={callerType}
                   onChange={e => setCallerType(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 bg-white text-gray-900 font-medium"
+                  className="input w-full"
                 >
                   <option value="investor">Investor</option>
                   <option value="prospect">Prospect</option>
                 </select>
               </div>
               <button
-                type="button"
-                onClick={connectToCall}
-                className="w-full bg-red-400 hover:bg-red-500 text-white px-6 py-3 rounded-lg font-bold tracking-wide transition-colors mt-2 text-base"
+                type="submit"
+                className="btn btn-accent w-full mt-2 text-sm"
               >
                 Start Call
               </button>
             </form>
           </section>
-        </main>
+        </div>
       </div>
     );
   }
 
   if (showChat) {
     return (
-      <div className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased">
+      <div className="min-h-screen bg-surface-primary text-text-main">
         <div className="container mx-auto px-4 py-8">
           <div className="max-w-6xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -559,12 +558,12 @@ export default function Home() {
                   email={email}
                 />
               </div>
-              <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                <h2 className="text-xl font-bold mb-4 text-gray-900 tracking-tight">AI Chat Demo</h2>
+              <div className="card p-6">
+                <h2 className="text-sm font-bold text-text-main mb-4 tracking-tight">AI Chat Demo</h2>
                 <div className="space-y-4">
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <h3 className="font-bold text-red-700 mb-2 tracking-wide">Features Available</h3>
-                    <ul className="text-gray-600 text-sm space-y-1 font-medium">
+                  <div className="bg-surface-card border border-border-dim rounded-md p-4">
+                    <h3 className="text-xs font-bold text-accent-red mb-2 tracking-wide uppercase">Features</h3>
+                    <ul className="text-text-muted text-xs space-y-1">
                       <li>Voice-to-text transcription</li>
                       <li>Context-aware AI responses</li>
                       <li>Text-to-speech playback</li>
@@ -575,7 +574,7 @@ export default function Home() {
                 </div>
                 <button
                   onClick={() => setShowChat(false)}
-                  className="w-full mt-6 bg-red-400 hover:bg-red-500 text-white px-6 py-3 rounded-lg font-bold tracking-wide transition-colors"
+                  className="btn btn-accent w-full mt-6"
                 >
                   Close Chat Demo
                 </button>
@@ -591,67 +590,71 @@ export default function Home() {
     <DeepgramContextProvider>
       <MicrophoneContextProvider>
         <RoomContext.Provider value={roomInstance}>
-          <div className="min-h-screen h-screen w-full bg-gray-50 text-gray-900 flex flex-col font-sans antialiased">
-            <header className="w-full py-4 px-6 border-b border-gray-200 bg-white shadow-sm">
-              <div className="flex items-start justify-between">
-                <div className="flex flex-col">
-                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight leading-tight">
-                    Support Call in Progress
-                  </h1>
-                  <div className="flex items-center mt-1 space-x-2">
-                    <span className="text-sm text-gray-500 font-medium">Room:</span>
-                    <span className="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded border">
-                      {currentRoom}
-                    </span>
-                  </div>
-                </div>
+          <div className="h-full w-full bg-surface-primary text-text-main flex flex-col">
+            <div className="flex items-center justify-between px-6 py-3 border-b border-border-dim bg-surface-secondary">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-accent-success animate-pulse" />
+                <span className="text-xs font-bold text-text-main tracking-wide">Support Call in Progress</span>
               </div>
-            </header>
-        <main className="flex-1 w-full flex flex-row h-full overflow-hidden">
-          <section className="flex flex-1 flex-row h-full w-full">
-            <div className="flex-1 flex flex-col h-full min-w-0">
-              <div className="flex flex-row items-center justify-between px-6 py-4 border-b border-gray-200 bg-white">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold text-gray-900 tracking-tight">{email}</span>
-                  <span className="text-xs text-gray-500 font-medium">{roomInstance.localParticipant.identity}</span>
-                </div>
-              </div>
-              <div className="flex-1 flex flex-col bg-gray-100 min-h-0">
-                <div className="flex-1 min-h-0 p-4">
-                  <MyVideoConference />
-                  <RoomAudioRenderer />
-                </div>
-                <div className="w-full border-t border-gray-200 bg-white px-4 py-3 flex-shrink-0 flex justify-center shadow-sm z-10">
-                  <ControlBar />
-                </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-text-muted">Room:</span>
+                <span className="text-xs font-mono text-text-label bg-surface-card px-2 py-1 rounded border border-border-dim">
+                  {currentRoom}
+                </span>
               </div>
             </div>
-            <div className="w-[1.5px] bg-gradient-to-b from-gray-200/80 via-gray-300/60 to-gray-100/0 mx-0" style={{ minHeight: '100%' }} />
-            <aside className="w-full max-w-[380px] flex flex-col h-full bg-white">
-              <div className="flex flex-col h-full px-0 py-0">
-                <div className="flex-1 min-h-0">
-                  <LiveKitChatInterface 
-                    ref={chatInterfaceRef}
-                    room={roomInstance}
-                    localUserType="caller"
-                    className="h-full"
-                  />
+            <main className="flex-1 flex flex-row overflow-hidden">
+              <section className="flex flex-1 flex-row">
+                <div className="flex-1 flex flex-col min-w-0">
+                  <div className="flex items-center justify-between px-6 py-3 border-b border-border-dim bg-surface-card">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-text-main">{email}</span>
+                      <span className="text-xs text-text-muted">{roomInstance.localParticipant.identity}</span>
+                    </div>
+                    <button
+                      onClick={() => setShowChat(true)}
+                      className="btn btn-ghost text-xs"
+                    >
+                      <MessageSquare className="w-3 h-3" />
+                      AI Chat
+                    </button>
+                  </div>
+                  <div className="flex-1 flex flex-col bg-surface-primary min-h-0">
+                    <div className="flex-1 min-h-0 p-4">
+                      <MyVideoConference />
+                      <RoomAudioRenderer />
+                    </div>
+                    <div className="border-t border-border-dim bg-surface-card px-4 py-2 flex-shrink-0 flex justify-center">
+                      <ControlBar />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </aside>
-          </section>
-        </main>
-        
-        <MiniLiveTranscription 
-          ref={miniTranscriptionRef}
-          room={roomInstance} 
-          autoSendWordCount={7} 
-          onMessageSent={handleAutoTranscriptionMessage}
-          isHidden={true}
-          externalMicControl={true}
-        />
-      </div>
-    </RoomContext.Provider>
+                <div className="w-px bg-border-dim mx-0" style={{ minHeight: '100%' }} />
+                <aside className="w-full max-w-[380px] flex flex-col bg-surface-card">
+                  <div className="flex flex-col h-full px-0 py-0">
+                    <div className="flex-1 min-h-0">
+                      <LiveKitChatInterface 
+                        ref={chatInterfaceRef}
+                        room={roomInstance}
+                        localUserType="caller"
+                        className="h-full"
+                      />
+                    </div>
+                  </div>
+                </aside>
+              </section>
+            </main>
+            
+            <MiniLiveTranscription 
+              ref={miniTranscriptionRef}
+              room={roomInstance} 
+              autoSendWordCount={7} 
+              onMessageSent={handleAutoTranscriptionMessage}
+              isHidden={true}
+              externalMicControl={true}
+            />
+          </div>
+        </RoomContext.Provider>
       </MicrophoneContextProvider>
     </DeepgramContextProvider>
   );
@@ -667,19 +670,19 @@ function MyVideoConference() {
   );
   
   return (
-    <div className="w-full h-full bg-gray-900 rounded-lg overflow-hidden relative">
+    <div className="w-full h-full bg-surface-primary rounded-md overflow-hidden relative">
       <GridLayout 
         tracks={tracks} 
         style={{ 
           height: '100%', 
           width: '100%',
-          backgroundColor: '#1f2937'
+          backgroundColor: '#0A0A12'
         }}
       >
         <ParticipantTile 
           style={{
-            backgroundColor: '#374151',
-            borderRadius: '8px',
+            backgroundColor: '#111119',
+            borderRadius: '4px',
             minHeight: '200px'
           }}
         />

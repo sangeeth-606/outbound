@@ -30,12 +30,8 @@ export default function TranscriptionDisplay({
   const [transcriptionError, setTranscriptionError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  // Removed mock transcription data for production
-  // TODO: Implement real-time transcription integration
-
   useEffect(() => {
     if (isActive && isRecording) {
-      // Fetch transcription data periodically with error handling
       const interval = setInterval(async () => {
         try {
           const response = await fetch('/api/transcription/get', {
@@ -58,7 +54,6 @@ export default function TranscriptionDisplay({
             setTranscriptionError(null);
             setRetryCount(0);
 
-            // Set current transcript to the latest final transcript
             const finalTranscripts = (data.transcripts || []).filter((t: any) => t.is_final);
             if (finalTranscripts.length > 0) {
               setCurrentTranscript(finalTranscripts[finalTranscripts.length - 1].text);
@@ -71,7 +66,6 @@ export default function TranscriptionDisplay({
           const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
           setTranscriptionError(`Transcription service error: ${errorMessage}`);
 
-          // Implement retry logic with exponential backoff
           setRetryCount(prev => {
             const newCount = prev + 1;
             if (newCount >= 3) {
@@ -80,7 +74,7 @@ export default function TranscriptionDisplay({
             return newCount;
           });
         }
-      }, Math.min(2000 * Math.pow(1.5, retryCount), 10000)); // Exponential backoff, max 10s
+      }, Math.min(2000 * Math.pow(1.5, retryCount), 10000));
 
       return () => clearInterval(interval);
     } else {
@@ -92,7 +86,6 @@ export default function TranscriptionDisplay({
 
   useEffect(() => {
     if (isActive) {
-      // Load existing transcription data
       const loadTranscripts = async () => {
         try {
           const response = await fetch('/api/transcription/get', {
@@ -111,7 +104,6 @@ export default function TranscriptionDisplay({
           }
         } catch (error) {
           console.error('Failed to load transcription:', error);
-          // Don't show error for missing transcription API - it's optional
           setTranscripts([]);
         }
       };
@@ -141,34 +133,33 @@ export default function TranscriptionDisplay({
       animate={{ opacity: 1, height: 'auto' }}
       exit={{ opacity: 0, height: 0 }}
       transition={{ duration: 0.3 }}
-      className="bg-white/10 backdrop-blur-sm rounded-xl shadow-lg border border-blue-500/20 overflow-hidden"
+      className="card overflow-hidden"
     >
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600/20 to-purple-600/20 p-4 border-b border-blue-500/20">
+      <div className="bg-surface-secondary p-4 border-b border-border-dim">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <FileText className="w-5 h-5 text-blue-400" />
-            <h3 className="text-lg font-semibold text-white">Live Transcription</h3>
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-text-label" />
+            <h3 className="text-xs font-bold text-text-main uppercase tracking-wider">Live Transcription</h3>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={toggleRecording}
-              className={`flex items-center space-x-2 px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 px-3 py-1 rounded text-xs font-bold transition-colors ${
                 isRecording
-                  ? 'bg-red-600 hover:bg-red-700 text-white'
-                  : 'bg-green-600 hover:bg-green-700 text-white'
+                  ? 'bg-accent-red text-white hover:bg-accent-red/80'
+                  : 'bg-accent-success/20 text-accent-success hover:bg-accent-success/30 border border-accent-success/30'
               }`}
             >
               {isRecording ? (
                 <>
-                  <MicOff className="w-4 h-4" />
+                  <MicOff className="w-3 h-3" />
                   <span>Stop</span>
                 </>
               ) : (
                 <>
-                  <Mic className="w-4 h-4" />
+                  <Mic className="w-3 h-3" />
                   <span>Start</span>
                 </>
               )}
@@ -176,39 +167,37 @@ export default function TranscriptionDisplay({
           </div>
         </div>
 
-        {/* Recording Status */}
-        <div className="flex items-center space-x-2 mt-2">
+        <div className="flex items-center gap-2 mt-2">
           <motion.div
             animate={{
               scale: isRecording ? [1, 1.2, 1] : 1,
-              backgroundColor: transcriptionError ? '#EF4444' : (isRecording ? '#EF4444' : '#6B7280')
+              backgroundColor: transcriptionError ? '#FF6B6B' : (isRecording ? '#FF6B6B' : '#4A4A5A')
             }}
             transition={{ duration: 1, repeat: (isRecording && !transcriptionError) ? Infinity : 0 }}
-            className="w-2 h-2 rounded-full"
+            className="w-1.5 h-1.5 rounded-full"
           ></motion.div>
-          <span className={`text-sm ${
-            transcriptionError ? 'text-red-400' :
-            isRecording ? 'text-red-400' : 'text-gray-400'
+          <span className={`text-xs ${
+            transcriptionError ? 'text-accent-red' :
+            isRecording ? 'text-accent-red' : 'text-text-muted'
           }`}>
             {transcriptionError ? 'Transcription Error' :
              isRecording ? 'Recording & Transcribing' : 'Ready to record'}
           </span>
         </div>
 
-        {/* Error Display */}
         {transcriptionError && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="mt-3 p-3 bg-red-900/20 border border-red-500/30 rounded-lg"
+            className="mt-3 p-3 bg-accent-red/10 border border-accent-red/20 rounded-md"
           >
-            <div className="flex items-center space-x-2">
-              <span className="text-red-400 text-sm">⚠️</span>
-              <span className="text-red-300 text-sm">{transcriptionError}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-accent-red text-xs">⚠</span>
+              <span className="text-accent-red text-xs">{transcriptionError}</span>
             </div>
             {retryCount < 3 && (
-              <p className="text-red-400 text-xs mt-1">
+              <p className="text-accent-red/70 text-[10px] mt-1">
                 Retrying... ({retryCount}/3)
               </p>
             )}
@@ -216,25 +205,23 @@ export default function TranscriptionDisplay({
         )}
       </div>
 
-      {/* Current Transcript */}
       <AnimatePresence>
         {currentTranscript && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="p-4 bg-blue-900/10 border-b border-blue-500/20"
+            className="p-4 bg-surface-primary border-b border-border-dim"
           >
-            <div className="flex items-center space-x-2 mb-2">
-              <Volume2 className="w-4 h-4 text-blue-400" />
-              <span className="text-sm text-blue-400 font-medium">Live Transcript</span>
+            <div className="flex items-center gap-2 mb-2">
+              <Volume2 className="w-3 h-3 text-accent-cyan" />
+              <span className="text-xs text-accent-cyan font-bold uppercase tracking-wider">Live</span>
             </div>
-            <p className="text-white text-sm italic">{currentTranscript}</p>
+            <p className="text-xs text-text-main italic">{currentTranscript}</p>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Transcript History */}
       <div className="max-h-64 overflow-y-auto p-4 space-y-3">
         <AnimatePresence>
           {transcripts.map((transcript, index) => (
@@ -246,28 +233,28 @@ export default function TranscriptionDisplay({
               className={`flex ${transcript.speaker === 'customer' ? 'justify-start' : 'justify-end'}`}
             >
               <div
-                className={`max-w-xs lg:max-w-md px-3 py-2 rounded-lg text-sm ${
+                className={`max-w-xs lg:max-w-md px-3 py-2 rounded text-xs ${
                   transcript.speaker === 'customer'
-                    ? 'bg-green-600/20 border border-green-500/30 text-green-100'
-                    : 'bg-blue-600/20 border border-blue-500/30 text-blue-100'
+                    ? 'bg-accent-success/10 border border-accent-success/20 text-text-main'
+                    : 'bg-accent-cyan/10 border border-accent-cyan/20 text-text-main'
                 }`}
               >
-                <div className="flex items-center space-x-2 mb-1">
-                  <span className={`text-xs font-medium ${
-                    transcript.speaker === 'customer' ? 'text-green-400' : 'text-blue-400'
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className={`text-[10px] font-bold ${
+                    transcript.speaker === 'customer' ? 'text-accent-success' : 'text-accent-cyan'
                   }`}>
                     {transcript.speaker === 'customer' ? 'Customer' : 'Agent'}
                   </span>
-                  <span className="text-xs text-gray-400">
+                  <span className="text-[10px] text-text-muted">
                     {formatTime(transcript.timestamp)}
                   </span>
                   {transcript.confidence && (
-                    <span className="text-xs text-gray-500">
+                    <span className="text-[10px] text-text-muted">
                       {Math.round(transcript.confidence * 100)}%
                     </span>
                   )}
                 </div>
-                <p className="text-white leading-relaxed">{transcript.text}</p>
+                <p className="text-text-main leading-relaxed">{transcript.text}</p>
               </div>
             </motion.div>
           ))}
@@ -275,16 +262,15 @@ export default function TranscriptionDisplay({
 
         {transcripts.length === 0 && !isRecording && (
           <div className="text-center py-8">
-            <FileText className="w-12 h-12 text-gray-500 mx-auto mb-3" />
-            <p className="text-gray-400 text-sm">No transcripts yet</p>
-            <p className="text-gray-500 text-xs">Click "Start" to begin recording</p>
+            <FileText className="w-8 h-8 text-text-muted mx-auto mb-3" />
+            <p className="text-text-muted text-xs">No transcripts yet</p>
+            <p className="text-text-muted text-[10px]">Click Start to begin recording</p>
           </div>
         )}
       </div>
 
-      {/* Footer with stats */}
-      <div className="bg-gray-800/50 p-3 border-t border-gray-600/20">
-        <div className="flex justify-between text-xs text-gray-400">
+      <div className="bg-surface-secondary p-3 border-t border-border-dim">
+        <div className="flex justify-between text-[10px] text-text-muted">
           <span>Transcripts: {transcripts.length}</span>
           <span>Room: {roomName}</span>
         </div>

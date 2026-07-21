@@ -18,10 +18,10 @@ import { Room } from "livekit-client";
 interface MiniLiveTranscriptionProps {
   className?: string;
   room?: Room;
-  autoSendWordCount?: number; // Number of words to trigger auto-send
-  onMessageSent?: (message: string) => void; // Callback for when a message is sent
-  isHidden?: boolean; // Hide the UI but keep functionality
-  externalMicControl?: boolean; // Control microphone externally
+  autoSendWordCount?: number;
+  onMessageSent?: (message: string) => void;
+  isHidden?: boolean;
+  externalMicControl?: boolean;
 }
 
 export interface MiniLiveTranscriptionRef {
@@ -51,12 +51,10 @@ const MiniLiveTranscription = forwardRef<MiniLiveTranscriptionRef, MiniLiveTrans
   const captionTimeout = useRef<any>(null);
   const keepAliveInterval = useRef<any>(null);
 
-  // Function to count words in a string
   const countWords = (text: string): number => {
     return text.trim().split(/\s+/).filter(word => word.length > 0).length;
   };
 
-  // Function to send message to LiveKit chat
   const sendToChat = async (text: string) => {
     console.log('🚀 sendToChat called with:', { text, hasRoom: !!room, roomConnected: room?.state });
     
@@ -87,7 +85,6 @@ const MiniLiveTranscription = forwardRef<MiniLiveTranscriptionRef, MiniLiveTrans
       setMessagesSent(prev => prev + 1);
       console.log("✅ Auto-transcription message sent successfully:", text.trim());
       
-      // Notify parent component that a message was sent
       if (onMessageSent) {
         console.log('📞 Calling onMessageSent callback');
         onMessageSent(text.trim());
@@ -99,7 +96,6 @@ const MiniLiveTranscription = forwardRef<MiniLiveTranscriptionRef, MiniLiveTrans
     }
   };
 
-  // Expose methods to parent component
   useImperativeHandle(ref, () => ({
     startTranscription: async () => {
       console.log('🎤 startTranscription called, isActive:', isActive);
@@ -200,7 +196,6 @@ const MiniLiveTranscription = forwardRef<MiniLiveTranscriptionRef, MiniLiveTrans
       if (thisCaption !== "") {
         setCaption(thisCaption);
         
-        // Accumulate text for auto-sending
         if (isFinal) {
           console.log('📝 Final transcript, updating accumulated text...');
           setAccumulatedText(prev => {
@@ -217,11 +212,10 @@ const MiniLiveTranscription = forwardRef<MiniLiveTranscriptionRef, MiniLiveTrans
               hasRoom: !!room
             });
             
-            // Auto-send when reaching word count threshold
             if (isAutoSendEnabled && room && wordCount >= autoSendWordCount) {
               console.log('🚀 Word threshold reached, sending to chat...');
               sendToChat(newText.trim());
-              return ""; // Reset accumulated text after sending
+              return "";
             }
             
             return newText.trim();
@@ -274,9 +268,8 @@ const MiniLiveTranscription = forwardRef<MiniLiveTranscriptionRef, MiniLiveTrans
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [microphoneState, connectionState, isActive]);
 
-  // Conditionally render the UI - hide if isHidden is true but keep functionality
   if (isHidden) {
-    return null; // Component is hidden but all hooks and functionality remain active
+    return null;
   }
 
   if (isMinimized) {
@@ -284,7 +277,7 @@ const MiniLiveTranscription = forwardRef<MiniLiveTranscriptionRef, MiniLiveTrans
       <div className={`fixed top-4 right-4 z-50 ${className}`}>
         <button
           onClick={() => setIsMinimized(false)}
-          className="bg-gray-800 text-white p-3 rounded-full shadow-lg hover:bg-gray-700 transition-colors"
+          className="bg-surface-card text-text-main p-3 rounded-md shadow-lg border border-border-dim hover:bg-surface-hover transition-colors"
         >
           {isActive ? <Volume2 size={20} /> : <VolumeX size={20} />}
         </button>
@@ -294,71 +287,72 @@ const MiniLiveTranscription = forwardRef<MiniLiveTranscriptionRef, MiniLiveTrans
 
   return (
     <div className={`fixed top-4 right-4 z-50 ${className}`}>
-      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm">
-        {/* Header */}
+      <div className="card p-4 max-w-sm">
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${isActive && connectionState === LiveConnectionState.OPEN ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-            <span className="text-sm font-medium text-gray-700">Live Transcription</span>
+          <div className="flex items-center gap-2">
+            <div className={`w-1.5 h-1.5 rounded-full ${isActive && connectionState === LiveConnectionState.OPEN ? 'bg-accent-success' : 'bg-text-muted'}`}></div>
+            <span className="text-xs font-bold text-text-main uppercase tracking-wider">Live Transcription</span>
             {room && (
-              <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded">
+              <span className="text-[10px] bg-accent-cyan/10 text-accent-cyan px-1.5 py-0.5 rounded border border-accent-cyan/20">
                 Auto-chat
               </span>
             )}
           </div>
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center gap-1">
             {room && (
               <button
                 onClick={() => setIsAutoSendEnabled(!isAutoSendEnabled)}
-                className={`p-1.5 rounded transition-colors ${
+                className={`p-1 rounded transition-colors ${
                   isAutoSendEnabled 
-                    ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-accent-cyan/10 text-accent-cyan hover:bg-accent-cyan/20' 
+                    : 'bg-surface-secondary text-text-muted hover:bg-surface-hover'
                 }`}
                 title={`Auto-send ${isAutoSendEnabled ? 'enabled' : 'disabled'}`}
               >
-                <MessageSquare size={16} />
+                <MessageSquare size={14} />
               </button>
             )}
             <button
               onClick={toggleTranscription}
               disabled={externalMicControl}
-              className={`p-1.5 rounded ${isActive ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'} transition-colors ${
+              className={`p-1 rounded ${
+                isActive 
+                  ? 'bg-accent-red/10 text-accent-red hover:bg-accent-red/20' 
+                  : 'bg-accent-success/10 text-accent-success hover:bg-accent-success/20'
+              } transition-colors ${
                 externalMicControl ? 'opacity-50 cursor-not-allowed' : ''
               }`}
               title={externalMicControl ? 'Controlled by LiveKit microphone' : (isActive ? 'Stop transcription' : 'Start transcription')}
             >
-              {isActive ? <MicOff size={16} /> : <Mic size={16} />}
+              {isActive ? <MicOff size={14} /> : <Mic size={14} />}
             </button>
             <button
               onClick={() => setIsMinimized(true)}
-              className="p-1.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+              className="p-1 rounded bg-surface-secondary text-text-muted hover:bg-surface-hover transition-colors"
             >
-              <VolumeX size={16} />
+              <VolumeX size={14} />
             </button>
           </div>
         </div>
 
-        {/* Transcript Display */}
-        <div className="bg-gray-50 rounded p-3 min-h-[60px]">
-          <p className="text-sm text-gray-700 leading-relaxed">
+        <div className="bg-surface-secondary rounded p-3 min-h-[60px]">
+          <p className="text-xs text-text-main leading-relaxed">
             {isActive 
               ? (caption || "Listening...") 
               : "Click to start live transcription"
             }
           </p>
           {accumulatedText && (
-            <div className="mt-2 pt-2 border-t border-gray-200">
-              <p className="text-xs text-gray-500">
+            <div className="mt-2 pt-2 border-t border-border-dim">
+              <p className="text-[10px] text-text-muted">
                 Pending ({countWords(accumulatedText)}/{autoSendWordCount} words): 
               </p>
-              <p className="text-xs text-gray-600 italic">"{accumulatedText}"</p>
+              <p className="text-[10px] text-text-muted italic">"{accumulatedText}"</p>
             </div>
           )}
         </div>
 
-        {/* Status */}
-        <div className="mt-2 flex justify-between items-center text-xs text-gray-500">
+        <div className="mt-2 flex justify-between items-center text-[10px] text-text-muted">
           <span>
             {isActive ? (
               connectionState === LiveConnectionState.OPEN ? "Connected & Listening" : "Connecting..."
@@ -367,7 +361,7 @@ const MiniLiveTranscription = forwardRef<MiniLiveTranscriptionRef, MiniLiveTrans
             )}
           </span>
           {room && messagesSent > 0 && (
-            <span className="bg-green-100 text-green-600 px-2 py-0.5 rounded">
+            <span className="bg-accent-success/10 text-accent-success px-1.5 py-0.5 rounded border border-accent-success/20">
               {messagesSent} sent
             </span>
           )}
@@ -377,7 +371,6 @@ const MiniLiveTranscription = forwardRef<MiniLiveTranscriptionRef, MiniLiveTrans
   );
 });
 
-// Set display name for debugging
 MiniLiveTranscription.displayName = 'MiniLiveTranscription';
 
 export default MiniLiveTranscription;

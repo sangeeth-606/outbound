@@ -2,69 +2,218 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --color-surface-primary: #0A0A12;
+    --color-surface-secondary: #111119;
+    --color-surface-card: #1a1a2e;
+    --color-surface-hover: #222233;
+    --color-text-main: #EAEAEA;
+    --color-text-muted: #888899;
+    --color-text-label: #666680;
+    --color-border-dim: #333344;
+    --color-border-separator: #222233;
+    --color-accent-red: #FF6B6B;
+    --color-accent-cyan: #00FFD1;
+    --color-accent-success: #00FF88;
+    --color-accent-warning: #FFAA00;
+    --color-accent-danger: #FF4444;
+    --color-accent-info: #4ECDC4;
   }
-}
 
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
+  * {
+    box-sizing: border-box;
+  }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-}
-
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-.imgDark {
-  display: none;
-}
-
-@media (prefers-color-scheme: dark) {
   html {
     color-scheme: dark;
   }
 
-  .imgLight {
-    display: none;
+  body {
+    background-color: #0A0A12;
+    color: #EAEAEA;
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  .imgDark {
-    display: unset;
+
+  ::selection {
+    background-color: rgba(255, 107, 107, 0.3);
+    color: #EAEAEA;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #0A0A12;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #333344;
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #444455;
+  }
+
+  input, select, textarea, button {
+    font-family: inherit;
   }
 }
 
-/* LiveKit participant name styling */
+@layer components {
+  .sidebar-item {
+    @apply flex items-center gap-3 px-4 py-2.5 text-sm text-text-muted hover:text-text-main hover:bg-surface-hover transition-colors duration-150 border-l-2 border-transparent;
+  }
+
+  .sidebar-item.active {
+    @apply text-accent-red border-l-2 border-accent-red bg-surface-hover/50;
+  }
+
+  .status-dot {
+    @apply inline-block w-1.5 h-1.5 rounded-full;
+  }
+
+  .status-dot.live {
+    @apply bg-accent-success;
+    box-shadow: 0 0 6px rgba(0, 255, 136, 0.5);
+  }
+
+  .status-dot.offline {
+    @apply bg-text-label;
+  }
+
+  .status-dot.busy {
+    @apply bg-accent-warning;
+  }
+
+  .status-dot.error {
+    @apply bg-accent-danger;
+  }
+
+  .card {
+    @apply bg-surface-card border border-border-dim rounded-lg;
+  }
+
+  .card-header {
+    @apply px-4 py-3 border-b border-border-separator text-xs font-bold uppercase tracking-wider text-text-label;
+  }
+
+  .card-body {
+    @apply p-4;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-accent-red/50 disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-primary {
+    @apply btn bg-accent-red text-white hover:bg-accent-red/90;
+  }
+
+  .btn-secondary {
+    @apply btn bg-surface-hover text-text-main border border-border-dim hover:bg-border-dim;
+  }
+
+  .btn-danger {
+    @apply btn bg-accent-danger text-white hover:bg-accent-danger/90;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-text-muted hover:text-text-main hover:bg-surface-hover;
+  }
+
+  .input {
+    @apply w-full px-3 py-2 text-sm bg-surface-primary border border-border-dim rounded-md text-text-main placeholder:text-text-label focus:outline-none focus:ring-2 focus:ring-accent-red/50 focus:border-accent-red/50 transition-colors duration-150;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-sm uppercase tracking-wider;
+  }
+
+  .badge-success {
+    @apply badge bg-accent-success/15 text-accent-success;
+  }
+
+  .badge-warning {
+    @apply badge bg-accent-warning/15 text-accent-warning;
+  }
+
+  .badge-danger {
+    @apply badge bg-accent-danger/15 text-accent-danger;
+  }
+
+  .badge-info {
+    @apply badge bg-accent-info/15 text-accent-info;
+  }
+
+  .badge-neutral {
+    @apply badge bg-surface-hover text-text-muted;
+  }
+
+  .table-header {
+    @apply px-4 py-3 text-xs font-bold uppercase tracking-wider text-text-label bg-surface-secondary border-b border-border-separator;
+  }
+
+  .table-cell {
+    @apply px-4 py-3 text-sm text-text-main border-b border-border-separator;
+  }
+
+  .table-row {
+    @apply hover:bg-surface-hover transition-colors duration-100;
+  }
+
+  .select {
+    @apply input appearance-none cursor-pointer;
+  }
+}
+
+@layer utilities {
+  .text-accent {
+    color: var(--color-accent-red);
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+}
+
 .lk-participant-tile .lk-participant-name,
 .lk-participant-tile .lk-participant-metadata,
 [data-lk-theme] .lk-participant-name,
 [data-lk-theme] .lk-participant-metadata {
   color: white !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  font-family: 'JetBrains Mono', monospace !important;
 }
 
-/* Ensure participant placeholders also have white text */
 .lk-participant-placeholder .lk-participant-name,
 .lk-participant-placeholder .lk-participant-metadata {
   color: white !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+[data-lk-theme] {
+  --lk-bg: #0A0A12 !important;
+  --lk-bg2: #1a1a2e !important;
+  --lk-bg3: #222233 !important;
+  --lk-fg: #EAEAEA !important;
+  --lk-accent-bg: #FF6B6B !important;
+  --lk-accent-fg: #0A0A12 !important;
+  --lk-danger: #FF4444 !important;
+  --lk-success: #00FF88 !important;
+  --lk-border-color: #333344 !important;
+  --lk-control-bg: #1a1a2e !important;
+  --lk-control-hover-bg: #222233 !important;
+  --lk-control-fg: #EAEAEA !important;
+  --lk-va-background: #0A0A12 !important;
+  font-family: 'JetBrains Mono', monospace !important;
 }
