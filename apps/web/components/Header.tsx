@@ -39,6 +39,7 @@ export function Header() {
           <div className="marquee-content">
             <span className="text-[10px] text-accent-warning tracking-widest uppercase whitespace-nowrap px-8">{marqueeText}</span>
             <span className="text-[10px] text-accent-warning tracking-widest uppercase whitespace-nowrap px-8">{marqueeText}</span>
+            <span className="text-[10px] text-accent-warning tracking-widest uppercase whitespace-nowrap px-8">{marqueeText}</span>
           </div>
         </div>
       </div>
