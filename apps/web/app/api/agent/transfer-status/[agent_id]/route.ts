@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
-export async function GET(request: NextRequest, { params }: { params: { agent_id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ agent_id: string }> }) {
   try {
     const { agent_id } = await params;
     
@@ -34,9 +34,9 @@ export async function GET(request: NextRequest, { params }: { params: { agent_id
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { agent_id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ agent_id: string }> }) {
   try {
-    const { agent_id } = params;
+    const { agent_id } = await params;
     
     const response = await fetch(`${BACKEND_URL}/api/agent/transfer-status/${agent_id}`, {
       method: 'DELETE',

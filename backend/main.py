@@ -35,7 +35,8 @@ from models import (
     PickNextCustomerRequest, PickNextCustomerResponse,
     StartTranscriptionRequest, StartTranscriptionResponse,
     StopTranscriptionRequest, StopTranscriptionResponse,
-    GetTranscriptionRequest, GetTranscriptionResponse
+    GetTranscriptionRequest, GetTranscriptionResponse,
+    TokenRequest, TokenResponse
 )
 import asyncio
 from fastapi import WebSocket
@@ -228,6 +229,16 @@ async def create_room_endpoint(request: CreateRoomRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create room: {str(e)}")
+
+@app.post("/api/auth/token", response_model=TokenResponse)
+async def get_token_endpoint(request: TokenRequest):
+    """Generate signed LiveKit room token for a participant"""
+    try:
+        token = create_room_token(request.room, request.username)
+        return TokenResponse(token=token)
+    except Exception as e:
+        logger.error(f"Failed to generate room token: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate room token: {str(e)}")
 
 @app.post("/api/transfer/initiate", response_model=TransferInitiateResponse)
 async def initiate_transfer(request: TransferInitiateRequest):

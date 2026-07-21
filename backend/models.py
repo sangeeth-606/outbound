@@ -152,3 +152,11 @@ class GetTranscriptionResponse(BaseModel):
     success: bool
     transcripts: List[TranscriptionSegment]
     message: str
+
+class TokenRequest(BaseModel):
+    room: str
+    username: str
+
+class TokenResponse(BaseModel):
+    token: str
+

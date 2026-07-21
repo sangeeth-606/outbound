@@ -52,22 +52,28 @@ export async function GET(req: NextRequest) {
         caller_context: data.caller_context || null
       }, { headers: { "Cache-Control": "no-store" } });
     } else {
-      // For agents, use direct token generation (no queue)
-      const apiKey = process.env.LIVEKIT_API_KEY;
-      const apiSecret = process.env.LIVEKIT_API_SECRET;
-      const wsUrl = process.env.LIVEKIT_URL;
+      // For agents, fetch direct token from the backend
+      const response = await fetch(`${BACKEND_URL}/api/auth/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          room: room,
+          username: username,
+        }),
+      });
 
-      if (!apiKey || !apiSecret || !wsUrl) {
-        return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Backend token error:', errorText);
+        throw new Error(`Backend token responded with status: ${response.status}`);
       }
 
-      const { AccessToken } = await import('livekit-server-sdk');
-      const at = new AccessToken(apiKey, apiSecret, { identity: username });
-      at.addGrant({ room, roomJoin: true, canPublish: true, canSubscribe: true });
-
+      const data = await response.json();
       return NextResponse.json(
         {
-          token: await at.toJwt(),
+          token: data.token,
           queue_status: "connected" // Agents always connect directly
         },
         { headers: { "Cache-Control": "no-store" } },
