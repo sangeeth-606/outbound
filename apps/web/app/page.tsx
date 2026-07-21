@@ -1,645 +1,689 @@
-"use client"
+'use client';
 
-import Link from "next/link"
-import type React from "react"
-import { useState } from "react"
-
-// Custom Button Component
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "outline"
-  children: React.ReactNode
-}
-
-const Button: React.FC<ButtonProps> = ({ 
-  variant = "default", 
-  className = "", 
-  children, 
-  ...props 
-}) => {
-  const baseClasses = "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none"
-  
-  const variantClasses = {
-    default: "bg-primary text-primary-foreground hover:bg-primary/90",
-    outline: "border border-gray-300 bg-white text-black hover:bg-gray-50"
-  }
-  
-  const classes = `${baseClasses} ${variantClasses[variant]} ${className}`
-  
-  return (
-    <button className={classes} {...props}>
-      {children}
-    </button>
-  )
-}
-
-// Custom Input Component
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
-
-const Input: React.FC<InputProps> = ({ className = "", ...props }) => {
-  const baseClasses = "flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-  
-  return (
-    <input className={`${baseClasses} ${className}`} {...props} />
-  )
-}
+import {
+  ControlBar,
+  GridLayout,
+  ParticipantTile,
+  RoomAudioRenderer,
+  useTracks,
+  RoomContext,
+} from '@livekit/components-react';
+import { Room, Track, RoomEvent } from 'livekit-client';
+import '@livekit/components-styles';
+import { useEffect, useState, useRef } from 'react';
+import { Phone, MessageSquare, Users, PhoneOff, User } from 'lucide-react';
+import ChatInterface from '../components/ChatInterface';
+import LiveKitChatInterface, { LiveKitChatInterfaceRef } from '../components/LiveKitChatInterface';
+import MiniLiveTranscription, { MiniLiveTranscriptionRef } from '../components/MiniLiveTranscription';
+import { DeepgramContextProvider } from './context/DeepgramContextProvider';
+import { MicrophoneContextProvider } from './context/MicrophoneContextProvider';
 
 export default function Home() {
-  const [formData, setFormData] = useState({
-    firstName: "",
-    email: "",
-    phone: "",
-    accredited: "",
-  })
+  const room = 'support_room';
+  const name = 'customer';
+  const [roomInstance] = useState(() => new Room({
+    adaptiveStream: true,
+    dynacast: true,
+  }));
+  const [token, setToken] = useState('');
+  const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const chatInterfaceRef = useRef<LiveKitChatInterfaceRef>(null);
+  const miniTranscriptionRef = useRef<MiniLiveTranscriptionRef>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showChat, setShowChat] = useState(false);
+  const [callerType, setCallerType] = useState('investor');
+  const [email, setEmail] = useState('');
+  const [transferStatus, setTransferStatus] = useState<'idle' | 'in_progress' | 'completed'>('idle');
+  const [transferMessage, setTransferMessage] = useState<string | null>(null);
+  const [queueStatus, setQueueStatus] = useState<'idle' | 'waiting' | 'connecting' | 'connected'>('idle');
+  const [queuePosition, setQueuePosition] = useState<number | null>(null);
+  const [estimatedWaitTime, setEstimatedWaitTime] = useState<number | null>(null);
+  const [queuePollInterval, setQueuePollInterval] = useState<NodeJS.Timeout | null>(null);
+  const [currentRoom, setCurrentRoom] = useState(room);
+  const [transferRoomToken, setTransferRoomToken] = useState<string | null>(null);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
+  useEffect(() => {
+    return () => {
+      roomInstance.disconnect();
+    };
+  }, [roomInstance]);
+
+  // WebSocket for notifications - connect directly to backend
+  useEffect(() => {
+    if (!email) {
+      console.log('No email provided, skipping WebSocket connection');
+      return;
+    }
+
+    console.log('Setting up WebSocket connection for email:', email);
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+
+    const connectWebSocket = () => {
+      try {
+        const backendProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const backendHost = process.env.NEXT_PUBLIC_BACKEND_HOST || 'localhost:8000';
+        const wsUrl = `${backendProtocol}//${backendHost}/ws/notifications`;
+        
+        console.log('Attempting WebSocket connection to:', wsUrl);
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          console.log('Customer WebSocket connected');
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ email }));
+          }
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            console.log('Customer WebSocket message:', message);
+            
+            if (message.type === 'agent_assigned' && message.email === email) {
+              console.log('AGENT ASSIGNED! Email:', message.email, 'Room:', message.room_name);
+              setCurrentRoom(message.room_name);
+              setToken(message.customer_token);
+              
+              console.log('Setting UI to connecting state...');
+              setQueueStatus('connecting');
+              setIsConnecting(true);
+              roomInstance.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://your-livekit-server.com', message.customer_token)
+                .then(() => {
+                  console.log('Successfully connected to LiveKit room');
+                  setIsConnected(true);
+                  setQueueStatus('connected');
+                  setIsConnecting(false);
+                  
+                  if (queuePollInterval) {
+                    clearInterval(queuePollInterval);
+                    setQueuePollInterval(null);
+                  }
+                })
+                .catch((e) => {
+                  console.error('WS connect failed:', e);
+                  setIsConnecting(false);
+                  setQueueStatus('idle');
+                });
+            } else if (message.type === 'acknowledgment') {
+              console.log('WebSocket acknowledgment received:', message);
+            } else if (message.type === 'error') {
+              console.error('WebSocket error from server:', message);
+            }
+          } catch (parseError) {
+            console.error('Failed to parse WebSocket message:', parseError, 'Raw data:', event.data);
+          }
+        };
+
+        ws.onclose = (event) => {
+          console.log('Customer WebSocket disconnected:', event.code, event.reason);
+          reconnectTimeout = setTimeout(() => {
+            console.log('Attempting WebSocket reconnection...');
+            connectWebSocket();
+          }, 3000);
+        };
+
+        ws.onerror = (error) => {
+          console.error('Customer WebSocket error:', error);
+        };
+      } catch (error) {
+        console.error('Failed to create WebSocket connection:', error);
+      }
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+      if (ws) {
+        ws.close();
+      }
+    };
+  }, [email, roomInstance, queuePollInterval]);
+
+  useEffect(() => {
+    if (!roomInstance) return;
+
+    console.log('Setting up room event listeners...');
+
+    const onConnected = () => {
+      console.log('Room connected successfully');
+      
+      if (roomInstance.localParticipant?.audioTrackPublications.size > 0) {
+        roomInstance.localParticipant.audioTrackPublications.forEach((publication) => {
+          if (miniTranscriptionRef.current && !miniTranscriptionRef.current.isTranscriptionActive()) {
+            miniTranscriptionRef.current.startTranscription().then(() => {
+              console.log('Transcription state after start (existing):', miniTranscriptionRef.current?.getTranscriptionState());
+            }).catch((error) => {
+              console.error('Failed to start transcription for existing track:', error);
+            });
+          }
+        });
+      }
+    };
+
+    const onTrackPublished = (publication: any, participant: any) => {
+      if (publication.kind === 'audio' && participant.isLocal) {
+        if (miniTranscriptionRef.current && !miniTranscriptionRef.current.isTranscriptionActive()) {
+          miniTranscriptionRef.current.startTranscription().then(() => {
+            console.log('Transcription state after start (published):', miniTranscriptionRef.current?.getTranscriptionState());
+          }).catch((error) => {
+            console.error('Failed to start transcription:', error);
+          });
+        }
+      }
+    };
+
+    const onTrackUnpublished = (publication: any, participant: any) => {
+      if (publication.kind === 'audio' && participant.isLocal) {
+        if (miniTranscriptionRef.current && miniTranscriptionRef.current.isTranscriptionActive()) {
+          miniTranscriptionRef.current.stopTranscription();
+        }
+      }
+    };
+
+    const onTrackMuted = (track: any, participant: any) => {
+      if (track.kind === 'audio' && participant.isLocal) {
+        setTimeout(() => {
+          const localParticipant = roomInstance.localParticipant;
+          if (localParticipant) {
+            const microphoneEnabled = localParticipant.isMicrophoneEnabled;
+            
+            if (!microphoneEnabled) {
+              if (miniTranscriptionRef.current && miniTranscriptionRef.current.isTranscriptionActive()) {
+                miniTranscriptionRef.current.stopTranscription();
+              }
+            }
+          }
+        }, 100);
+      }
+    };
+
+    const onTrackUnmuted = (track: any, participant: any) => {
+      if (track.kind === 'audio' && participant.isLocal) {
+        const localParticipant = roomInstance.localParticipant;
+        if (localParticipant) {
+          const microphoneEnabled = localParticipant.isMicrophoneEnabled;
+          
+          if (microphoneEnabled) {
+            if (miniTranscriptionRef.current && !miniTranscriptionRef.current.isTranscriptionActive()) {
+              miniTranscriptionRef.current.startTranscription().then(() => {
+                console.log('Transcription state after start (re-enabled):', miniTranscriptionRef.current?.getTranscriptionState());
+              }).catch((error) => {
+                console.error('Failed to start transcription (re-enabled):', error);
+              });
+            }
+          }
+        }
+      }
+    };
+
+    roomInstance.on(RoomEvent.Connected, onConnected);
+    roomInstance.on(RoomEvent.TrackPublished, onTrackPublished);
+    roomInstance.on(RoomEvent.LocalTrackPublished, onTrackPublished);
+    roomInstance.on(RoomEvent.TrackUnpublished, onTrackUnpublished);
+    roomInstance.on(RoomEvent.LocalTrackUnpublished, onTrackUnpublished);
+    roomInstance.on(RoomEvent.TrackMuted, onTrackMuted);
+    roomInstance.on(RoomEvent.TrackUnmuted, onTrackUnmuted);
+
+    return () => {
+      roomInstance.off(RoomEvent.Connected, onConnected);
+      roomInstance.off(RoomEvent.TrackPublished, onTrackPublished);
+      roomInstance.off(RoomEvent.LocalTrackPublished, onTrackPublished);
+      roomInstance.off(RoomEvent.TrackUnpublished, onTrackUnpublished);
+      roomInstance.off(RoomEvent.LocalTrackUnpublished, onTrackUnpublished);
+      roomInstance.off(RoomEvent.TrackMuted, onTrackMuted);
+      roomInstance.off(RoomEvent.TrackUnmuted, onTrackUnmuted);
+    };
+  }, [roomInstance, miniTranscriptionRef]);
+
+  useEffect(() => {
+    if (queueStatus === 'waiting' || queueStatus === 'connecting') {
+      console.log('Customer is waiting/connecting, ensuring WebSocket is active for email:', email);
+    }
+  }, [queueStatus, email]);
+
+  const pollQueueStatus = async () => {
+    try {
+      const resp = await fetch('/api/queue/status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+
+        const t = data.token || data.access_token;
+        if (t && data.room_name) {
+          console.log('Received access token from queue, connecting...');
+          setToken(t);
+          setCurrentRoom(data.room_name);
+          await roomInstance.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://your-livekit-server.com', t);
+          setIsConnected(true);
+          setQueueStatus('connected');
+
+          if (queuePollInterval) {
+            clearInterval(queuePollInterval);
+            setQueuePollInterval(null);
+          }
+          return;
+        }
+
+        if (data.position === 0 || data.error === "Customer not found in queue") {
+          console.log('Customer no longer in queue, stopping polling');
+          if (queuePollInterval) {
+            clearInterval(queuePollInterval);
+            setQueuePollInterval(null);
+          }
+          return;
+        }
+
+        setQueuePosition(data.position);
+        setEstimatedWaitTime(data.estimated_wait_time);
+
+        if (data.position === 1 && data.agents_available > 0) {
+          await attemptConnection();
+        }
+      } else if (resp.status === 404) {
+        console.log('Customer not found in queue, stopping polling');
+        if (queuePollInterval) {
+          clearInterval(queuePollInterval);
+          setQueuePollInterval(null);
+        }
+      } else {
+        console.error('Queue status request failed:', resp.status);
+      }
+    } catch (e) {
+      console.error('Failed to poll queue status:', e);
+      if (queuePollInterval) {
+        clearInterval(queuePollInterval);
+        setQueuePollInterval(null);
+      }
+    }
+  };
+
+  const attemptConnection = async () => {
+    try {
+      setQueueStatus('connecting');
+      console.log('Attempting connection with room:', currentRoom, 'email:', email);
+      
+      const resp = await fetch(`/api/token?room=${currentRoom}&username=${name}&callerType=${callerType}&email=${email}`);
+      const data = await resp.json();
+
+      const t = data.token || data.access_token;
+      if (data.queue_status === 'connected' && t) {
+        console.log('Connected immediately to agent!');
+        setToken(t);
+        setCurrentRoom(data.room_name || currentRoom);
+        await roomInstance.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://your-livekit-server.com', t);
+        setIsConnected(true);
+        setQueueStatus('connected');
+
+        if (queuePollInterval) {
+          clearInterval(queuePollInterval);
+          setQueuePollInterval(null);
+        }
+
+        roomInstance.on(RoomEvent.DataReceived, (payload, participant) => {
+          try {
+            const data = JSON.parse(new TextDecoder().decode(payload));
+            if (data.type === 'transfer_initiated') {
+              setTransferStatus('in_progress');
+              setTransferMessage('Your call is being transferred to a specialist. Please hold...');
+            } else if (data.type === 'transfer_ready') {
+              setTransferStatus('completed');
+              setTransferMessage('Transfer completed. A specialist has joined your call.');
+            } else if (data.type === 'transfer_completed') {
+              setTransferStatus('completed');
+              setTransferMessage('Transfer completed. You are now connected to a specialist.');
+            }
+          } catch (e) {
+            console.error('Failed to parse data message:', e);
+          }
+        });
+      } else if (data.queue_status === 'waiting') {
+        setQueueStatus('waiting');
+        setQueuePosition(data.queue_position || null);
+        setEstimatedWaitTime(data.estimated_wait_time || null);
+        console.log('Added to queue, position:', data.queue_position);
+        
+        const interval = setInterval(pollQueueStatus, 3000);
+        setQueuePollInterval(interval);
+      } else {
+        console.error('Unexpected queue status:', data.queue_status);
+        setError('Unexpected response from server');
+        setQueueStatus('idle');
+      }
+    } catch (e) {
+      console.error('Connection error:', e);
+      setError(e instanceof Error ? e.message : 'Failed to connect');
+      setQueueStatus('idle');
+    }
+  };
+
+  const connectToCall = async () => {
+    if (!email.trim()) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    try {
+      setIsConnecting(true);
+      setError(null);
+      setQueueStatus('connecting');
+
+      await attemptConnection();
+      console.log('Polling queue, current room:', currentRoom, 'status:', queueStatus);
+
+      if (queueStatus === 'waiting') {
+        const interval = setInterval(pollQueueStatus, 5000);
+        setQueuePollInterval(interval);
+      }
+
+      setIsConnecting(false);
+    } catch (e) {
+      console.error('Connection error:', e);
+      setError(e instanceof Error ? e.message : 'Failed to connect');
+      setIsConnecting(false);
+      setQueueStatus('idle');
+    }
+  };
+
+  const disconnect = async () => {
+    await roomInstance.disconnect();
+    setIsConnected(false);
+    setQueueStatus('idle');
+    setQueuePosition(null);
+    setEstimatedWaitTime(null);
+
+    if (queuePollInterval) {
+      clearInterval(queuePollInterval);
+      setQueuePollInterval(null);
+    }
+  };
+
+  const handleAutoTranscriptionMessage = (message: string) => {
+    console.log('Caller received auto-transcription message:', message);
+    if (chatInterfaceRef.current) {
+      chatInterfaceRef.current.addAutoMessage(message);
+    }
+  };
+
+  const switchToTransferRoom = async (transferRoomName: string, callerToken: string, summary: string) => {
+    try {
+      setTransferMessage(`Transferring to specialist... ${summary}`);
+
+      await roomInstance.disconnect();
+
+      setToken(callerToken);
+      setCurrentRoom(transferRoomName);
+      await roomInstance.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL || 'wss://your-livekit-server.com', callerToken);
+
+      setTransferStatus('completed');
+      setTransferMessage('You are now connected to a specialist.');
+
+      alert(`Transferred to specialist!\n\nTransfer Summary: ${summary}\n\nRoom: ${transferRoomName}`);
+    } catch (e) {
+      console.error('Failed to switch to transfer room:', e);
+      setTransferMessage('Transfer failed. Please try again.');
+    }
+  };
+
+  if (isConnecting || queueStatus === 'connecting') {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex items-center justify-center font-sans antialiased">
+        <div className="bg-white rounded-lg shadow-md p-8 max-w-md mx-auto border border-gray-200">
+          <div className="animate-spin w-8 h-8 border-2 border-red-400 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <h2 className="text-xl font-bold mb-2 text-gray-900 tracking-tight">Connecting...</h2>
+          <p className="text-gray-600 font-medium">Please wait while we connect you to support</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (queueStatus === 'waiting') {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex items-center justify-center font-sans antialiased">
+        <div className="bg-white rounded-lg shadow-md p-8 max-w-md mx-auto border border-gray-200">
+          <div className="animate-pulse w-16 h-16 bg-red-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+            <Users className="w-8 h-8 text-red-400" />
+          </div>
+          <h2 className="text-xl font-bold mb-2 text-gray-900 tracking-tight">Waiting in Queue</h2>
+          <p className="text-gray-600 mb-4 font-medium">All our agents are currently busy. You're in the queue to speak with support.</p>
+
+          {queuePosition && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-700 font-semibold">Your Position:</span>
+                <span className="text-red-400 font-bold text-lg tracking-tight">#{queuePosition}</span>
+              </div>
+              {estimatedWaitTime && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-700 font-semibold">Estimated Wait:</span>
+                  <span className="text-red-400 font-bold tracking-tight">
+                    {Math.floor(estimatedWaitTime / 60)}:{(estimatedWaitTime % 60).toString().padStart(2, '0')}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="text-center">
+            <button
+              onClick={() => {
+                if (queuePollInterval) {
+                  clearInterval(queuePollInterval);
+                  setQueuePollInterval(null);
+                }
+                setQueueStatus('idle');
+                setQueuePosition(null);
+                setEstimatedWaitTime(null);
+              }}
+              className="bg-red-400 hover:bg-red-500 text-white px-6 py-3 rounded-lg font-bold tracking-wide transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex items-center justify-center font-sans antialiased">
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg max-w-md mx-auto font-semibold">
+          Error: {error}
+        </div>
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans antialiased">
+        <main className="flex-1 w-full flex justify-center items-center px-4 md:px-8 lg:px-20 pb-8">
+          <section className="w-full max-w-md">
+            <h2 className="text-2xl font-semibold mb-6 text-gray-900 text-center tracking-tight">Start Your Call</h2>
+            <form className="space-y-6">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 tracking-wide">Your Email Address</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 bg-white text-gray-900 font-medium placeholder:text-gray-500 placeholder:font-normal"
+                  placeholder="you@example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2 tracking-wide">Caller Type</label>
+                <select
+                  value={callerType}
+                  onChange={e => setCallerType(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 bg-white text-gray-900 font-medium"
+                >
+                  <option value="investor">Investor</option>
+                  <option value="prospect">Prospect</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={connectToCall}
+                className="w-full bg-red-400 hover:bg-red-500 text-white px-6 py-3 rounded-lg font-bold tracking-wide transition-colors mt-2 text-base"
+              >
+                Start Call
+              </button>
+            </form>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  if (showChat) {
+    return (
+      <div className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="h-[600px]">
+                <ChatInterface 
+                  callerType={callerType as "investor" | "prospect"}
+                  email={email}
+                />
+              </div>
+              <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                <h2 className="text-xl font-bold mb-4 text-gray-900 tracking-tight">AI Chat Demo</h2>
+                <div className="space-y-4">
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <h3 className="font-bold text-red-700 mb-2 tracking-wide">Features Available</h3>
+                    <ul className="text-gray-600 text-sm space-y-1 font-medium">
+                      <li>Voice-to-text transcription</li>
+                      <li>Context-aware AI responses</li>
+                      <li>Text-to-speech playback</li>
+                      <li>Conversation history</li>
+                      <li>Personalized assistance</li>
+                    </ul>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowChat(false)}
+                  className="w-full mt-6 bg-red-400 hover:bg-red-500 text-white px-6 py-3 rounded-lg font-bold tracking-wide transition-colors"
+                >
+                  Close Chat Demo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <div className="flex items-center">
-              <img
-                src="https://attack.capital/images/logo.png"
-                alt="Attack Capital logo"
-                className="w-8 h-8 mr-3 object-contain"
-              />
-              <span className="text-xl font-semibold text-gray-900">Attack.Capital</span>
-            </div>
-
-            {/* Navigation */}
-            <nav className="hidden md:flex items-center space-x-8">
-              <a href="#" className="text-gray-700 hover:text-gray-900 font-medium">
-                OUR FUNDS
-              </a>
-              <a href="#" className="text-gray-700 hover:text-gray-900 font-medium">
-                PRESENTATION
-              </a>
-              <a href="#" className="text-gray-700 hover:text-gray-900 font-medium">
-                INVESTORS
-              </a>
-              <Link href="/support" className="text-gray-700 hover:text-gray-900 font-medium">
-                TEAM
-              </Link>
-              {/* <Link href="/live-transcribe" className="text-gray-700 hover:text-gray-900 font-medium">
-                LIVE TRANSCRIBE
-              </Link> */}
-            </nav>
-
-            {/* CTA Buttons */}
-            <div className="flex items-center space-x-4">
-              <Link href="/caller">
-                <Button
-                  variant="outline"
-                  className="hidden sm:inline-flex"
-                >
-                  SCHEDULE CALL
-                </Button>
-              </Link>
-              <Button className="bg-red-400 hover:bg-red-500 text-white px-6">INVEST NOW</Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid lg:grid-cols-2 gap-16 items-start">
-          {/* Left Column */}
-          <div className="space-y-8">
-            <div>
-              <h1 className="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-8">
-                Join Attack Capital's
-                <br />
-                Access Fund
-              </h1>
-
-              <p className="text-lg text-gray-600 leading-relaxed mb-8">
-                Access the start-up asset class with a diversified, vetted group of seed-stage companies innovating in
-                AI to climate tech from recent Y Combinator batches.
-              </p>
-
-              <p className="text-sm text-gray-500 mb-8">*For Accredited investors only</p>
-
-              <Button className="bg-red-400 hover:bg-red-500 text-white px-8 py-3 text-lg">Become an Investor</Button>
-            </div>
-
-            <div className="text-xs text-gray-500 leading-relaxed">
-              Note this portfolio was put together by Attack Capital and allocations granted by the individual
-              companies, and is not sponsored by or endorsed by Y Combinator. "Y Combinator" is a registered trademark
-              of Y Combinator, LLC.
-            </div>
-          </div>
-
-          {/* Right Column - Form */}
-          <div className="bg-gradient-to-br from-orange-400 to-orange-500 rounded-2xl p-8 text-white">
-            <div className="mb-6">
-              <h3 className="text-lg font-medium mb-2 text-gray-900 drop-shadow-sm">
-                Read our strategy of investing across a portfolio of Y Combinator backed startups
-              </h3>
-            </div>
-
-            <div className="space-y-4 mb-6">
-              <Input
-                type="text"
-                name="firstName"
-                placeholder="First Name"
-                value={formData.firstName}
-                onChange={handleInputChange}
-                className="border-0"
-              />
-              <Input
-                type="email"
-                name="email"
-                placeholder="Email"
-                value={formData.email}
-                onChange={handleInputChange}
-                className="border-0"
-              />
-              <Input
-                type="tel"
-                name="phone"
-                placeholder="Phone"
-                value={formData.phone}
-                onChange={handleInputChange}
-                className="border-0"
-              />
-              <Input
-                type="text"
-                name="accredited"
-                placeholder="Are You An Accredited Investor?"
-                value={formData.accredited}
-                onChange={handleInputChange}
-                className="border-0"
-              />
-            </div>
-
-            <Button className="w-full bg-white hover:bg-gray-100 text-black py-3 font-medium">
-              Download Investor Presentation
-            </Button>
-          </div>
-        </div>
-      </main>
-
-      {/* Bottom Stats Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid md:grid-cols-3 gap-12">
-          {/* 0% Management fee */}
-          <div className="text-center md:text-left">
-            <div className="text-5xl font-bold text-gray-900 mb-2">0%</div>
-            <div className="text-xl font-semibold text-gray-900 mb-4">Management fee</div>
-            <p className="text-gray-600 leading-relaxed">
-              Your entire capital is invested without any deductions for fund filing & management charges.
-            </p>
-          </div>
-
-          {/* 20% Carried interest */}
-          <div className="text-center md:text-left">
-            <div className="text-5xl font-bold text-gray-900 mb-2">20%</div>
-            <div className="text-xl font-semibold text-gray-900 mb-4">Carried interest</div>
-            <p className="text-gray-600 leading-relaxed">
-              We take 20% out of the profits you make after we return your entire invested capital.
-            </p>
-          </div>
-
-          {/* $10k Min. investment */}
-          <div className="text-center md:text-left">
-            <div className="text-5xl font-bold text-gray-900 mb-2">$10k</div>
-            <div className="text-xl font-semibold text-gray-900 mb-4">Min. investment</div>
-            <p className="text-gray-600 leading-relaxed">
-              Access investment opportunities only available to the top 1% by network & net worth.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-        <div className="mb-4">
-          <p className="text-red-400 font-medium text-sm tracking-wide uppercase mb-4">PERFORMANCE IS EVERYTHING</p>
-          <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-16">What our investors are saying</h2>
-        </div>
-
-        <div className="space-y-12 mb-12">
-          {/* First Testimonial */}
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-left">
-            <img
-              src="https://attack.capital/images/investors/cory-hill.jpg"
-              alt="Cory Hill"
-              className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
-            />
-            <div className="flex-1">
-              <p className="text-lg text-gray-700 leading-relaxed mb-4">
-                Attack Capital, a YC-backed startup, gives me access to a portfolio of YC deals that otherwise would not
-                have been available through my network
-              </p>
-              <div className="flex items-center">
-                <span className="text-red-400 font-medium mr-2">—</span>
-                <span className="font-semibold text-red-400">Cory Hill,</span>
-                <span className="text-gray-700 ml-1">Ex Engineer at Facebook</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Second Testimonial */}
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-left">
-            <img
-              src="https://attack.capital/images/investors/varun-villait.jpg"
-              alt="Varun Villait"
-              className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
-            />
-            <div className="flex-1">
-              <p className="text-lg text-gray-700 leading-relaxed mb-4">
-                The Attack Capital team made it incredibly easy for me to add venture to my portfolio. The entire
-                process, from expressing interest to wiring funds, has been first class. I had a chance to speak with
-                Kaushik (GP) and loved his vision for the Demo Day fund.
-              </p>
-              <div className="flex items-center">
-                <span className="text-red-400 font-medium mr-2">—</span>
-                <span className="font-semibold text-red-400">Varun Villait,</span>
-                <span className="text-gray-700 ml-1">CPO at People data labs</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <p className="text-sm text-gray-500 mb-8">* Unpaid testimonials (they just love us that much)</p>
-
-        <Button className="bg-white hover:bg-gray-100 text-black px-8 py-3 text-lg">
-          Download Investor Presentation
-        </Button>
-      </section>
-
-      {/* Our Investors Section */}
-      <section className="bg-gray-50 py-16">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="text-center mb-16">
-            <p className="text-red-400 font-medium text-sm tracking-wide uppercase mb-4">BACKED BY THE BEST</p>
-            <h2 className="text-4xl lg:text-5xl font-bold text-gray-900">Our investors</h2>
-          </div>
-
-          {/* Investor Cards Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-20">
-            {/* Y Combinator */}
-            <div className="text-center">
-              <div className="mb-6">
-                <img
-                  src="https://attack.capital/images/products/y-combinator.png"
-                  alt="Y Combinator logo"
-                  className="w-16 h-16 mb-4 object-contain"
-                />
-                <div className="text-orange-500 font-semibold text-lg">Combinator</div>
-              </div>
-              <p className="text-gray-600 text-sm leading-relaxed">The #1 startup investor by unicorns funded</p>
-            </div>
-
-            {/* Slow Ventures */}
-            <div className="text-center">
-              <div className="mb-6">
-                <img
-                  src="https://attack.capital/images/products/slow-ventures.png"
-                  alt="Slow Ventures logo"
-                  className="w-16 h-16 mb-4 object-contain"
-                />
-              </div>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Valley based fund led by past executives of Facebook.com
-              </p>
-            </div>
-
-            {/* GFC */}
-            <div className="text-center">
-              <div className="mb-6">
-                <img
-                  src="https://attack.capital/images/products/gfc.png"
-                  alt="GFC logo"
-                  className="w-16 h-16 mb-4 object-contain"
-                />
-              </div>
-              <p className="text-gray-600 text-sm leading-relaxed">
-                Germany based fund led by the billionaire Oliver Samwer.
-              </p>
-            </div>
-
-            {/* Soma Capital */}
-            <div className="text-center">
-              <div className="mb-6">
-                <img
-                  src="https://attack.capital/images/products/soma-capital.png"
-                  alt="Soma Capital logo"
-                  className="w-16 h-16 mb-4 object-contain"
-                />
-              </div>
-              <p className="text-gray-600 text-sm leading-relaxed">Fund led by the owners of Sacramento Kings.</p>
-            </div>
-          </div>
-
-          {/* FAQ Section */}
-          <div className="max-w-4xl mx-auto">
-            <h3 className="text-3xl font-bold text-gray-900 text-center mb-12">Frequently Asked Questions</h3>
-
-            <div className="space-y-4">
-              {/* FAQ Item 1 - Expanded */}
-              <div className="border border-gray-200 rounded-lg">
-                <div className="p-6 border-b border-gray-200">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-lg font-medium text-gray-900">
-                      How does the Attack Capital Demo Day Fund work?
-                    </h4>
-                    <span className="text-gray-400 text-xl">−</span>
-                  </div>
-                </div>
-                <div className="p-6 bg-gray-50">
-                  <p className="text-gray-600">
-                    Your investment is invested in companies in recent Y Combinator batches.
-                  </p>
-                </div>
-              </div>
-
-              {/* FAQ Item 2 */}
-              <div className="border border-gray-200 rounded-lg">
-                <div className="p-6">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-lg font-medium text-gray-900">
-                      Is the Demo Day Access Fund associated with YC?
-                    </h4>
-                    <span className="text-gray-400 text-xl">+</span>
+    <DeepgramContextProvider>
+      <MicrophoneContextProvider>
+        <RoomContext.Provider value={roomInstance}>
+          <div className="min-h-screen h-screen w-full bg-gray-50 text-gray-900 flex flex-col font-sans antialiased">
+            <header className="w-full py-4 px-6 border-b border-gray-200 bg-white shadow-sm">
+              <div className="flex items-start justify-between">
+                <div className="flex flex-col">
+                  <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight leading-tight">
+                    Support Call in Progress
+                  </h1>
+                  <div className="flex items-center mt-1 space-x-2">
+                    <span className="text-sm text-gray-500 font-medium">Room:</span>
+                    <span className="text-sm font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded border">
+                      {currentRoom}
+                    </span>
                   </div>
                 </div>
               </div>
-
-              {/* FAQ Item 3 */}
-              <div className="border border-gray-200 rounded-lg">
-                <div className="p-6">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-lg font-medium text-gray-900">How many investments will the fund make?</h4>
-                    <span className="text-gray-400 text-xl">+</span>
-                  </div>
+            </header>
+        <main className="flex-1 w-full flex flex-row h-full overflow-hidden">
+          <section className="flex flex-1 flex-row h-full w-full">
+            <div className="flex-1 flex flex-col h-full min-w-0">
+              <div className="flex flex-row items-center justify-between px-6 py-4 border-b border-gray-200 bg-white">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-bold text-gray-900 tracking-tight">{email}</span>
+                  <span className="text-xs text-gray-500 font-medium">{roomInstance.localParticipant.identity}</span>
                 </div>
               </div>
-
-              {/* FAQ Item 4 */}
-              <div className="border border-gray-200 rounded-lg">
-                <div className="p-6">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-lg font-medium text-gray-900">
-                      What terms does the Access fund typically invest on?
-                    </h4>
-                    <span className="text-gray-400 text-xl">+</span>
-                  </div>
+              <div className="flex-1 flex flex-col bg-gray-100 min-h-0">
+                <div className="flex-1 min-h-0 p-4">
+                  <MyVideoConference />
+                  <RoomAudioRenderer />
                 </div>
-              </div>
-
-              {/* FAQ Item 5 */}
-              <div className="border border-gray-200 rounded-lg">
-                <div className="p-6">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-lg font-medium text-gray-900">What is the carry?</h4>
-                    <span className="text-gray-400 text-xl">+</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* FAQ Item 6 */}
-              <div className="border border-gray-200 rounded-lg">
-                <div className="p-6">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-lg font-medium text-gray-900">When are the capital calls?</h4>
-                    <span className="text-gray-400 text-xl">+</span>
-                  </div>
+                <div className="w-full border-t border-gray-200 bg-white px-4 py-3 flex-shrink-0 flex justify-center shadow-sm z-10">
+                  <ControlBar />
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Get Access Section */}
-      <section className="bg-white py-16">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          {/* GET ACCESS heading */}
-          <p className="text-red-400 font-medium text-sm tracking-wide uppercase mb-8">GET ACCESS</p>
-
-          {/* Investor logos */}
-          <div className="flex justify-center items-center gap-6 mb-12 flex-wrap">
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-              <span className="text-xs font-medium text-gray-600">YC</span>
-            </div>
-            <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
-              <span className="text-xs font-bold text-white">👑</span>
-            </div>
-            <div className="w-12 h-12 bg-green-600 rounded-full flex items-center justify-center">
-              <span className="text-xs font-bold text-white">UV</span>
-            </div>
-            <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center">
-              <span className="text-xs font-bold text-white">a16z</span>
-            </div>
-            <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center">
-              <span className="text-xs font-bold text-white">Y</span>
-            </div>
-            <div className="w-12 h-12 bg-gray-800 rounded-full flex items-center justify-center">
-              <span className="text-xs font-bold text-white">=</span>
-            </div>
-            <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center">
-              <span className="text-xs font-bold text-white">6VC</span>
-            </div>
-            <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center">
-              <span className="text-xs font-bold text-white">GFC</span>
-            </div>
-            <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-              <span className="text-xs font-bold text-white">$</span>
-            </div>
-          </div>
-
-          {/* Main heading */}
-          <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-8 text-balance">
-            Co-invest with the best venture capitalists & family offices.
-          </h2>
-
-          {/* CTA Button */}
-          <Button className="bg-red-400 hover:bg-red-500 text-white px-8 py-3 text-lg mb-16">Become an Investor</Button>
-
-          {/* Footer Links Grid */}
-          <div className="grid md:grid-cols-4 gap-8 text-left border-t border-gray-200 pt-12">
-            {/* About Attack Capital */}
-            <div>
-              <h3 className="text-red-400 font-semibold text-sm tracking-wide uppercase mb-4">ABOUT ATTACK CAPITAL</h3>
-              <p className="text-gray-600 text-sm leading-relaxed mb-6">
-                Attack Capital is a Y Combinator backed venture investing platform on a mission to expand co-investment
-                opportunities for individual accredited investors with tier-1 venture capital firms.
-              </p>
-
-              {/* Contact Info */}
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center text-red-400">
-                  <span className="mr-2">📞</span>
-                  <span>929-210-3809</span>
-                </div>
-                <div className="flex items-center text-red-400">
-                  <span className="mr-2">✉️</span>
-                  <span>ir@attack.capital</span>
-                </div>
-                <div className="flex items-center text-red-400">
-                  <span className="mr-2">📍</span>
-                  <span>650 Franklin Ave, Brooklyn, NY 11238</span>
+            <div className="w-[1.5px] bg-gradient-to-b from-gray-200/80 via-gray-300/60 to-gray-100/0 mx-0" style={{ minHeight: '100%' }} />
+            <aside className="w-full max-w-[380px] flex flex-col h-full bg-white">
+              <div className="flex flex-col h-full px-0 py-0">
+                <div className="flex-1 min-h-0">
+                  <LiveKitChatInterface 
+                    ref={chatInterfaceRef}
+                    room={roomInstance}
+                    localUserType="caller"
+                    className="h-full"
+                  />
                 </div>
               </div>
-            </div>
+            </aside>
+          </section>
+        </main>
+        
+        <MiniLiveTranscription 
+          ref={miniTranscriptionRef}
+          room={roomInstance} 
+          autoSendWordCount={7} 
+          onMessageSent={handleAutoTranscriptionMessage}
+          isHidden={true}
+          externalMicControl={true}
+        />
+      </div>
+    </RoomContext.Provider>
+      </MicrophoneContextProvider>
+    </DeepgramContextProvider>
+  );
+}
 
-            {/* Invest */}
-            <div>
-              <h3 className="text-red-400 font-semibold text-sm tracking-wide uppercase mb-4">INVEST</h3>
-              <div className="space-y-3">
-                <a href="#" className="block text-gray-600 hover:text-gray-900 text-sm">
-                  Download Presentation
-                </a>
-                <a href="#" className="block text-gray-600 hover:text-gray-900 text-sm">
-                  Make an Investment
-                </a>
-              </div>
-            </div>
-
-            {/* Learn */}
-            <div>
-              <h3 className="text-red-400 font-semibold text-sm tracking-wide uppercase mb-4">LEARN</h3>
-              <div className="space-y-3">
-                <a href="#" className="block text-gray-600 hover:text-gray-900 text-sm">
-                  Join our Newsletter
-                </a>
-                <a href="#" className="block text-gray-600 hover:text-gray-900 text-sm">
-                  Know our portfolio
-                </a>
-              </div>
-            </div>
-
-            {/* Company */}
-            <div>
-              <h3 className="text-red-400 font-semibold text-sm tracking-wide uppercase mb-4">COMPANY</h3>
-              <div className="space-y-3">
-                <a href="#" className="block text-gray-600 hover:text-gray-900 text-sm">
-                  Founders
-                </a>
-                <a href="#" className="block text-gray-600 hover:text-gray-900 text-sm">
-                  Linkedin
-                </a>
-                <a href="#" className="block text-gray-600 hover:text-gray-900 text-sm">
-                  Twitter
-                </a>
-                <a href="#" className="block text-gray-600 hover:text-gray-900 text-sm">
-                  Y Combinator
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-black text-white">
-        {/* Copyright bar */}
-        <div className="bg-gray-100 py-4">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <p className="text-sm text-gray-500">
-              © 2023 Better Financial Corporation • All Rights reserved • Terms & Conditions • Privacy Policy
-            </p>
-          </div>
-        </div>
-
-        {/* Legal content */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="space-y-8">
-            {/* Important Information */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">IMPORTANT INFORMATION</h3>
-              <div className="space-y-4 text-sm leading-relaxed text-gray-300">
-                <p>
-                  All trademarks, logos and brand names are the property of their respective owners. All company,
-                  product and service names used in this website are for identification purposes only. Use of these
-                  names, trademarks and brands does not imply endorsement.
-                </p>
-                <p>
-                  This page and the information contained herein is provided for informational and discussion purposes
-                  only and is not intended to be a recommendation for any investment or other advice of any kind, and
-                  shall not constitute or imply any offer to purchase, sell or hold any security or to enter into or
-                  engage in any type of transaction.
-                </p>
-                <p>
-                  Any financial projections or returns shown on the website are estimated predictions of performance
-                  only, are hypothetical, are not based on actual investment results and are not guarantees of future
-                  results. Estimated projections do not represent or guarantee the actual results of any transaction,
-                  and no representation is made that any transaction will, or is likely to, achieve results or profits
-                  similar to those shown. In addition, other financial metrics and calculations shown on the website
-                  (including amounts of principal and interest repaid) have not been independently verified or audited
-                  and may differ from the actual financial metrics and calculations for any investment, which are
-                  contained in the investors' portfolios. Any investment information contained herein has been secured
-                  from sources that Attack Capital believes are reliable, but we make no representations or warranties
-                  as to the accuracy of such information and accept no liability therefore.
-                </p>
-                <p>
-                  The Demo Day Access Fund is or will be a newly formed entity and has no operating history. Venture
-                  investing involves a high degree of risk and is suitable only for sophisticated and qualified
-                  accredited investors. Financial and operating risks confronting Startups are significant. While
-                  targeted returns should reflect the perceived level of risk in any investment situation, such returns
-                  may never be realized and/or may not be adequate to compensate an Investor or a Fund for risks taken.
-                  Loss of an Investor's entire investment is possible and can easily occur. Moreover, the timing of any
-                  return on investment is highly uncertain.
-                </p>
-              </div>
-            </div>
-
-            {/* Legal Disclaimer */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">LEGAL DISCLAIMER</h3>
-              <div className="text-sm leading-relaxed text-gray-300">
-                <p>
-                  The securities offered hereby have not been and will not be registered under the U.S. Securities Act
-                  of 1933, as amended (the "Act"), or any state securities laws or blue sky laws or the laws of any
-                  non-U.S. jurisdiction, and are being offered and sold in reliance on exemptions from the registration
-                  requirements of the Act and state securities laws. The securities cannot be offered, sold or otherwise
-                  transferred except in compliance with the Act. In addition, the securities cannot be sold or otherwise
-                  transferred except in compliance with the applicable state securities or blue sky laws. The securities
-                  have not been approved or disapproved by the SEC, any state securities commission or other regulatory
-                  authority, nor have any of the foregoing authorities passed upon the merits of this offering or the
-                  adequacy or accuracy of any other materials or information made available to subscriber in connection
-                  with this offering. Any representation to the contrary is unlawful. The securities may only be
-                  purchased by persons who are "accredited investors," as that term is defined in Section 501(a) of
-                  Regulation D promulgated under the Act. View Private Placement Memorandum.
-                </p>
-              </div>
-            </div>
-
-            {/* Forward Looking Statements */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">FORWARD LOOKING STATEMENTS</h3>
-              <div className="text-sm leading-relaxed text-gray-300">
-                <p>
-                  The offering materials may contain forward-looking statements and information relating to, among other
-                  things, Better Financial Corporation DBA Attack, its business plan and strategy, and its industry.
-                  These forward-looking statements are based on the beliefs of, assumptions made by, and information
-                  currently available to the company's management. When used in the offering materials, the words
-                  "estimate", "project", "believe", "anticipate", "intend", "expect" and similar expressions are
-                  intended to identify forward-looking statements, which constitute forward looking statements. These
-                  statements reflect management's current views with respect to future events and are subject to risks
-                  and uncertainties that could cause Better Financial Corporation DBA Attack actual results to differ
-                  materially from those contained in the forward-looking statements. Investors are cautioned not to
-                  place undue reliance on these forward-looking statements, which speak only as of the date on which
-                  they are made. Better Financial Corporation DBA Attack does not undertake any obligation to revise or
-                  update these forward-looking statements to reflect events or circumstances after such date or to
-                  reflect the occurrence of unanticipated events.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
+function MyVideoConference() {
+  const tracks = useTracks(
+    [
+      { source: Track.Source.Camera, withPlaceholder: true },
+      { source: Track.Source.ScreenShare, withPlaceholder: false },
+    ],
+    { onlySubscribed: false },
+  );
+  
+  return (
+    <div className="w-full h-full bg-gray-900 rounded-lg overflow-hidden relative">
+      <GridLayout 
+        tracks={tracks} 
+        style={{ 
+          height: '100%', 
+          width: '100%',
+          backgroundColor: '#1f2937'
+        }}
+      >
+        <ParticipantTile 
+          style={{
+            backgroundColor: '#374151',
+            borderRadius: '8px',
+            minHeight: '200px'
+          }}
+        />
+      </GridLayout>
     </div>
-  )
+  );
 }
